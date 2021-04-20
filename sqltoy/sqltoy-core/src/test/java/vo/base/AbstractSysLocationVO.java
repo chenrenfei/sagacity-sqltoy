@@ -8,6 +8,7 @@ import org.sagacity.sqltoy.config.annotation.Entity;
 import org.sagacity.sqltoy.config.annotation.Id;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 
 
 /**
@@ -15,7 +16,7 @@ import java.io.Serializable;
  * @version 1.0.0
  * Table: sys_location,Remark:地方表  
  */
-@Entity(tableName="sys_location")
+@Entity(tableName="sys_location",pk_constraint="sys_location_pk")
 public abstract class AbstractSysLocationVO implements Serializable,
 	Cloneable {
 	
@@ -28,7 +29,7 @@ public abstract class AbstractSysLocationVO implements Serializable,
 	 * jdbcType:bigserial
 	 * 
 	 */
-	@Id(strategy = "identity")
+	@Id(strategy="identity")
 	@Column(name="location_id",length=19L,defaultValue="'sys_location_location_id_seq'",type=java.sql.Types.BIGINT,nullable=false,autoIncrement=true)
 	protected Long locationId;
 	
@@ -40,38 +41,102 @@ public abstract class AbstractSysLocationVO implements Serializable,
 	protected String locationName;
 	
 	/**
-	 * jdbcType:int8
-	 * 在线人数
+	 * jdbcType:varchar
+	 * 地方简介
 	 */
-	@Column(name="online_persion",length=19L,type=java.sql.Types.BIGINT,nullable=true)
-	protected Long onlinePersion;
+	@Column(name="location_info",length=500L,type=java.sql.Types.VARCHAR,nullable=true)
+	protected String locationInfo;
+	
+	/**
+	 * jdbcType:numeric
+	 * 经度
+	 */
+	@Column(name="longitude",length=10L,type=java.sql.Types.DECIMAL,nullable=true)
+	protected BigDecimal longitude;
+	
+	/**
+	 * jdbcType:numeric
+	 * 纬度
+	 */
+	@Column(name="latitude",length=10L,type=java.sql.Types.DECIMAL,nullable=true)
+	protected BigDecimal latitude;
+	
+	/**
+	 * jdbcType:int4
+	 * 状态　0:不启用　0:启用
+	 */
+	@Column(name="status",length=10L,type=java.sql.Types.INTEGER,nullable=true)
+	protected Integer status;
 	
 	/**
 	 * jdbcType:int8
-	 * 总人数
+	 * 隶属国家行政区域编码
 	 */
-	@Column(name="total_persion",length=19L,type=java.sql.Types.BIGINT,nullable=true)
-	protected Long totalPersion;
+	@Column(name="area_code",length=19L,type=java.sql.Types.BIGINT,nullable=true)
+	protected Long areaCode;
+	
+	/**
+	 * jdbcType:int4
+	 * 公开状态　0:不公开　１：公开
+	 */
+	@Column(name="public_flag",length=10L,type=java.sql.Types.INTEGER,nullable=true)
+	protected Integer publicFlag;
+	
+	/**
+	 * jdbcType:int4
+	 * 虚拟地区标记　０：非虚拟　　１：虚拟
+	 */
+	@Column(name="virtual_flag",length=10L,type=java.sql.Types.INTEGER,nullable=true)
+	protected Integer virtualFlag;
+	
+	/**
+	 * jdbcType:varchar
+	 * 群聊ID
+	 */
+	@Column(name="group_chat_id",length=20L,type=java.sql.Types.VARCHAR,nullable=true)
+	protected String groupChatId;
+	
+	/**
+	 * jdbcType:int8
+	 * 地点类型
+	 */
+	@Column(name="location_type",length=19L,type=java.sql.Types.BIGINT,nullable=true)
+	protected Long locationType;
+	
+	/**
+	 * jdbcType:varchar
+	 * 地方背景图
+	 */
+	@Column(name="location_backimg",length=1000L,type=java.sql.Types.VARCHAR,nullable=true)
+	protected String locationBackimg;
 	
 
 	/** default constructor */
 	public AbstractSysLocationVO() {
 	}
 	
-
-	/** minimal constructor */
+	/** pk constructor */
 	public AbstractSysLocationVO(Long locationId)
 	{
 		this.locationId=locationId;
 	}
 
+
 	/** full constructor */
-	public AbstractSysLocationVO(Long locationId,String locationName,Long onlinePersion,Long totalPersion)
+	public AbstractSysLocationVO(Long locationId, String locationName, String locationInfo, BigDecimal longitude, BigDecimal latitude, Integer status, Long areaCode, Integer publicFlag, Integer virtualFlag, String groupChatId, Long locationType, String locationBackimg)
 	{
 		this.locationId=locationId;
 		this.locationName=locationName;
-		this.onlinePersion=onlinePersion;
-		this.totalPersion=totalPersion;
+		this.locationInfo=locationInfo;
+		this.longitude=longitude;
+		this.latitude=latitude;
+		this.status=status;
+		this.areaCode=areaCode;
+		this.publicFlag=publicFlag;
+		this.virtualFlag=virtualFlag;
+		this.groupChatId=groupChatId;
+		this.locationType=locationType;
+		this.locationBackimg=locationBackimg;
 	}
 	
 	/**
@@ -105,33 +170,153 @@ public abstract class AbstractSysLocationVO implements Serializable,
 	}
 	
 	/**
-	 *@param onlinePersion the onlinePersion to set
+	 *@param locationInfo the locationInfo to set
 	 */
-	public AbstractSysLocationVO setOnlinePersion(Long onlinePersion) {
-		this.onlinePersion=onlinePersion;
+	public AbstractSysLocationVO setLocationInfo(String locationInfo) {
+		this.locationInfo=locationInfo;
 		return this;
 	}
 		
 	/**
-	 *@return the OnlinePersion
+	 *@return the LocationInfo
 	 */
-	public Long getOnlinePersion() {
-	    return this.onlinePersion;
+	public String getLocationInfo() {
+	    return this.locationInfo;
 	}
 	
 	/**
-	 *@param totalPersion the totalPersion to set
+	 *@param longitude the longitude to set
 	 */
-	public AbstractSysLocationVO setTotalPersion(Long totalPersion) {
-		this.totalPersion=totalPersion;
+	public AbstractSysLocationVO setLongitude(BigDecimal longitude) {
+		this.longitude=longitude;
 		return this;
 	}
 		
 	/**
-	 *@return the TotalPersion
+	 *@return the Longitude
 	 */
-	public Long getTotalPersion() {
-	    return this.totalPersion;
+	public BigDecimal getLongitude() {
+	    return this.longitude;
+	}
+	
+	/**
+	 *@param latitude the latitude to set
+	 */
+	public AbstractSysLocationVO setLatitude(BigDecimal latitude) {
+		this.latitude=latitude;
+		return this;
+	}
+		
+	/**
+	 *@return the Latitude
+	 */
+	public BigDecimal getLatitude() {
+	    return this.latitude;
+	}
+	
+	/**
+	 *@param status the status to set
+	 */
+	public AbstractSysLocationVO setStatus(Integer status) {
+		this.status=status;
+		return this;
+	}
+		
+	/**
+	 *@return the Status
+	 */
+	public Integer getStatus() {
+	    return this.status;
+	}
+	
+	/**
+	 *@param areaCode the areaCode to set
+	 */
+	public AbstractSysLocationVO setAreaCode(Long areaCode) {
+		this.areaCode=areaCode;
+		return this;
+	}
+		
+	/**
+	 *@return the AreaCode
+	 */
+	public Long getAreaCode() {
+	    return this.areaCode;
+	}
+	
+	/**
+	 *@param publicFlag the publicFlag to set
+	 */
+	public AbstractSysLocationVO setPublicFlag(Integer publicFlag) {
+		this.publicFlag=publicFlag;
+		return this;
+	}
+		
+	/**
+	 *@return the PublicFlag
+	 */
+	public Integer getPublicFlag() {
+	    return this.publicFlag;
+	}
+	
+	/**
+	 *@param virtualFlag the virtualFlag to set
+	 */
+	public AbstractSysLocationVO setVirtualFlag(Integer virtualFlag) {
+		this.virtualFlag=virtualFlag;
+		return this;
+	}
+		
+	/**
+	 *@return the VirtualFlag
+	 */
+	public Integer getVirtualFlag() {
+	    return this.virtualFlag;
+	}
+	
+	/**
+	 *@param groupChatId the groupChatId to set
+	 */
+	public AbstractSysLocationVO setGroupChatId(String groupChatId) {
+		this.groupChatId=groupChatId;
+		return this;
+	}
+		
+	/**
+	 *@return the GroupChatId
+	 */
+	public String getGroupChatId() {
+	    return this.groupChatId;
+	}
+	
+	/**
+	 *@param locationType the locationType to set
+	 */
+	public AbstractSysLocationVO setLocationType(Long locationType) {
+		this.locationType=locationType;
+		return this;
+	}
+		
+	/**
+	 *@return the LocationType
+	 */
+	public Long getLocationType() {
+	    return this.locationType;
+	}
+	
+	/**
+	 *@param locationBackimg the locationBackimg to set
+	 */
+	public AbstractSysLocationVO setLocationBackimg(String locationBackimg) {
+		this.locationBackimg=locationBackimg;
+		return this;
+	}
+		
+	/**
+	 *@return the LocationBackimg
+	 */
+	public String getLocationBackimg() {
+	    return this.locationBackimg;
 	}
 
 
@@ -144,8 +329,16 @@ public abstract class AbstractSysLocationVO implements Serializable,
 		StringBuilder columnsBuffer=new StringBuilder();
 		columnsBuffer.append("locationId=").append(getLocationId()).append("\n");
 		columnsBuffer.append("locationName=").append(getLocationName()).append("\n");
-		columnsBuffer.append("onlinePersion=").append(getOnlinePersion()).append("\n");
-		columnsBuffer.append("totalPersion=").append(getTotalPersion()).append("\n");
+		columnsBuffer.append("locationInfo=").append(getLocationInfo()).append("\n");
+		columnsBuffer.append("longitude=").append(getLongitude()).append("\n");
+		columnsBuffer.append("latitude=").append(getLatitude()).append("\n");
+		columnsBuffer.append("status=").append(getStatus()).append("\n");
+		columnsBuffer.append("areaCode=").append(getAreaCode()).append("\n");
+		columnsBuffer.append("publicFlag=").append(getPublicFlag()).append("\n");
+		columnsBuffer.append("virtualFlag=").append(getVirtualFlag()).append("\n");
+		columnsBuffer.append("groupChatId=").append(getGroupChatId()).append("\n");
+		columnsBuffer.append("locationType=").append(getLocationType()).append("\n");
+		columnsBuffer.append("locationBackimg=").append(getLocationBackimg()).append("\n");
 		return columnsBuffer.toString();
 	}
 }

@@ -27,7 +27,7 @@ public class SqltoryConnectionManager implements ConnectionManager {
     public Connection getConnection(DataSource datasource) {
         try {
             Connection conn = ConnectionHoder.get();
-            if (null == conn) {
+            if (null == conn || conn.isClosed()) {
                 conn = datasource.getConnection();
             }
             ConnectionHoder.set(conn);

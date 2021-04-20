@@ -3,12 +3,7 @@
  */
 package org.sagacity.sqltoy.utils;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -550,11 +545,35 @@ public class StringUtil {
 			return new String[] { source };
 		}
 		if (filterMap == null || filterMap.isEmpty()) {
-			return source.split(splitSign);
+			if (splitSign.equals("?")) {
+				return source.split("\\?");
+			} else if (splitSign.equals(",")) {
+				return source.split("\\,");
+			} else if (splitSign.equals(";")) {
+				return source.split("\\;");
+			} else if (splitSign.equals(":")) {
+				return source.split("\\:");
+			} else if (splitSign.trim().equals("")) {
+				return source.split("\\s+");
+			} else {
+				return source.split(splitSign);
+			}
 		}
 		List<String[]> filters = matchFilters(source, filterMap);
 		if (filters.isEmpty()) {
-			return source.split(splitSign);
+			if (splitSign.equals("?")) {
+				return source.split("\\?");
+			} else if (splitSign.equals(",")) {
+				return source.split("\\,");
+			} else if (splitSign.equals(";")) {
+				return source.split("\\;");
+			} else if (splitSign.equals(":")) {
+				return source.split("\\:");
+			} else if (splitSign.trim().equals("")) {
+				return source.split("\\s+");
+			} else {
+				return source.split(splitSign);
+			}
 		}
 		int start = 0;
 		int skipIndex = 0;
@@ -904,5 +923,31 @@ public class StringUtil {
 		return SBCStr.replaceAll("\\；", ";").replaceAll("\\？", "?").replaceAll("\\．", ".").replaceAll("\\：", ":")
 				.replaceAll("\\＇", "'").replaceAll("\\＂", "\"").replaceAll("\\，", ",").replaceAll("\\【", "[")
 				.replaceAll("\\】", "]").replaceAll("\\）", ")").replaceAll("\\（", "(").replaceAll("\\＝", "=");
+	}
+
+	/**
+	 * @TODO 字符连接
+	 * @param sign
+	 * @param skipNull
+	 * @param arys
+	 * @return
+	 */
+	public static String linkAry(String sign, boolean skipNull, Object... arys) {
+		if (arys == null || arys.length == 0) {
+			return "";
+		}
+		String linkSign = (sign == null) ? "," : sign;
+		int index = 0;
+		StringBuilder result = new StringBuilder();
+		for (Object str : arys) {
+			if (str != null || !skipNull) {
+				if (index > 0) {
+					result.append(linkSign);
+				}
+				result.append((str == null) ? "null" : str.toString());
+				index++;
+			}
+		}
+		return result.toString();
 	}
 }

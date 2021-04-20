@@ -3,12 +3,12 @@
  */
 package org.sagacity.sqltoy.link;
 
-import javax.sql.DataSource;
-
 import org.sagacity.sqltoy.SqlToyContext;
 import org.sagacity.sqltoy.config.model.SqlToyConfig;
 import org.sagacity.sqltoy.config.model.SqlType;
 import org.sagacity.sqltoy.model.StoreResult;
+
+import javax.sql.DataSource;
 
 /**
  * @project sagacity-sqltoy
@@ -89,7 +89,7 @@ public class Store extends BaseLink {
 		if (sql == null) {
 			throw new IllegalArgumentException("call proceduce sql is null!");
 		}
-		SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sql, SqlType.search);
+		SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sql, SqlType.search, "");
 		return dialectFactory.executeStore(sqlToyContext, sqlToyConfig, inParamsValue, outParamsType, resultType,
 				getDataSource(sqlToyConfig));
 	}

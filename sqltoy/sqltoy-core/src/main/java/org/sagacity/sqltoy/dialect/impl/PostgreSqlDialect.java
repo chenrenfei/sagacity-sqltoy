@@ -3,16 +3,10 @@
  */
 package org.sagacity.sqltoy.dialect.impl;
 
-import java.io.Serializable;
-import java.sql.Connection;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-
+import org.sagacity.sqltoy.SqlExecuteStat;
 import org.sagacity.sqltoy.SqlToyContext;
 import org.sagacity.sqltoy.callback.ReflectPropertyHandler;
 import org.sagacity.sqltoy.callback.RowCallbackHandler;
-import org.sagacity.sqltoy.callback.UniqueSqlHandler;
 import org.sagacity.sqltoy.callback.UpdateRowHandler;
 import org.sagacity.sqltoy.config.model.EntityMeta;
 import org.sagacity.sqltoy.config.model.PKStrategy;
@@ -31,13 +25,19 @@ import org.sagacity.sqltoy.utils.ReservedWordsUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
+import java.sql.Connection;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
 /**
  * @project sqltoy-orm
  * @description 基于postgresql9.5+版本的方言实现,9.5开始insert into [ON CONFLICT DO
  *              NOTHING/UPDATE]功能生效
  * @author zhongxuchen <a href="mailto:zhongxuchen@gmail.com">联系作者</a>
  * @version id:PostgreSqlDialect.java,Revision:v1.0,Date:2015年8月10日
- * @modify Date:2019-3-12 修复saveOrUpdate的缺陷
+ * @modify Date:2019-3-12 修复saveOrUpdate的缺陷,改为先update后saveIgnore，因为其跟mysql一样存在bug
  * @modify Date:2020-06-12 修复10+版本对identity主键生成的策略
  */
 @SuppressWarnings({ "rawtypes" })
@@ -54,15 +54,11 @@ public class PostgreSqlDialect implements Dialect {
 
 	@Override
 	public boolean isUnique(SqlToyContext sqlToyContext, Serializable entity, String[] paramsNamed, Connection conn,
-			Integer dbType, String tableName) {
+			final Integer dbType, String tableName) {
 		return DialectUtils.isUnique(sqlToyContext, entity, paramsNamed, conn, dbType, tableName,
-				new UniqueSqlHandler() {
-					@Override
-					public String process(EntityMeta entityMeta, String[] realParamNamed, String tableName,
-							Integer dbType, int topSize) {
-						String queryStr = DialectExtUtils.wrapUniqueSql(entityMeta, realParamNamed, dbType, tableName);
-						return queryStr + " limit " + topSize;
-					}
+				(entityMeta, realParamNamed, table, topSize) -> {
+					String queryStr = DialectExtUtils.wrapUniqueSql(entityMeta, realParamNamed, dbType, table);
+					return queryStr + " limit " + topSize;
 				});
 	}
 
@@ -167,7 +163,7 @@ public class PostgreSqlDialect implements Dialect {
 			throws Exception {
 		EntityMeta entityMeta = sqlToyContext.getEntityMeta(entity.getClass());
 		// 获取loadsql(loadsql 可以通过@loadSql进行改变，所以需要sqltoyContext重新获取)
-		SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(entityMeta.getLoadSql(tableName), SqlType.search);
+		SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(entityMeta.getLoadSql(tableName), SqlType.search, "");
 		String loadSql = ReservedWordsUtil.convertSql(sqlToyConfig.getSql(dialect), dbType);
 		if (lockMode != null) {
 			switch (lockMode) {
@@ -300,6 +296,7 @@ public class PostgreSqlDialect implements Dialect {
 				NVL_FUNCTION, conn, dbType, autoCommit, tableName, false);
 	}
 
+	// 问为什么不用postgres的ON CONFLICT ON CONSTRAINT() DO UPDATE SET特性?原本是用的这个，但其有bug!
 	/*
 	 * (non-Javadoc)
 	 * 
@@ -334,12 +331,12 @@ public class PostgreSqlDialect implements Dialect {
 				reflectPropertyHandler, NVL_FUNCTION, conn, dbType, autoCommit, tableName, true);
 		// 如果修改的记录数量跟总记录数量一致,表示全部是修改
 		if (updateCnt >= entities.size()) {
-			logger.debug("修改记录数为:{}", updateCnt);
+			SqlExecuteStat.debug("修改记录", "修改记录量:" + updateCnt + " 条!");
 			return updateCnt;
 		}
 		Long saveCnt = saveAllIgnoreExist(sqlToyContext, entities, batchSize, reflectPropertyHandler, conn, dbType,
 				dialect, autoCommit, tableName);
-		logger.debug("修改记录数为:{},新建记录数为:{}", updateCnt, saveCnt);
+		SqlExecuteStat.debug("新增记录", "新建记录数量:" + saveCnt + " 条!");
 		return updateCnt + saveCnt;
 	}
 

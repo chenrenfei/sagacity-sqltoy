@@ -1,16 +1,10 @@
 package org.sagacity.sqltoy.dialect.impl;
 
-import java.io.Serializable;
-import java.sql.Connection;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-
+import org.sagacity.sqltoy.SqlExecuteStat;
 import org.sagacity.sqltoy.SqlToyConstants;
 import org.sagacity.sqltoy.SqlToyContext;
 import org.sagacity.sqltoy.callback.ReflectPropertyHandler;
 import org.sagacity.sqltoy.callback.RowCallbackHandler;
-import org.sagacity.sqltoy.callback.UniqueSqlHandler;
 import org.sagacity.sqltoy.callback.UpdateRowHandler;
 import org.sagacity.sqltoy.config.model.EntityMeta;
 import org.sagacity.sqltoy.config.model.PKStrategy;
@@ -34,6 +28,12 @@ import org.sagacity.sqltoy.utils.SqlUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
+import java.sql.Connection;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
 /**
  * @project sqltoy-orm
  * @description 国产达梦数据库方言支持(从DM8开始支持),问题: 1、dm数据库跟oracle差异:在merge
@@ -55,15 +55,11 @@ public class DMDialect implements Dialect {
 
 	@Override
 	public boolean isUnique(SqlToyContext sqlToyContext, Serializable entity, String[] paramsNamed, Connection conn,
-			Integer dbType, String tableName) {
+			final Integer dbType, String tableName) {
 		return DialectUtils.isUnique(sqlToyContext, entity, paramsNamed, conn, dbType, tableName,
-				new UniqueSqlHandler() {
-					@Override
-					public String process(EntityMeta entityMeta, String[] realParamNamed, String tableName,
-							Integer dbType, int topSize) {
-						String queryStr = DialectExtUtils.wrapUniqueSql(entityMeta, realParamNamed, dbType, tableName);
-						return queryStr + " limit " + topSize;
-					}
+				(entityMeta, realParamNamed, table, topSize) -> {
+					String queryStr = DialectExtUtils.wrapUniqueSql(entityMeta, realParamNamed, dbType, table);
+					return queryStr + " limit " + topSize;
 				});
 	}
 
@@ -98,6 +94,7 @@ public class DMDialect implements Dialect {
 			QueryExecutor queryExecutor, Long pageNo, Integer pageSize, Connection conn, final Integer dbType,
 			final String dialect) throws Exception {
 		StringBuilder sql = new StringBuilder();
+		boolean isNamed = sqlToyConfig.isNamedParam();
 		// 是否有order by,update 2017-5-22
 		boolean hasOrderBy = SqlUtil.hasOrderBy(
 				sqlToyConfig.isHasFast() ? sqlToyConfig.getFastSql(dialect) : sqlToyConfig.getSql(dialect), true);
@@ -113,9 +110,9 @@ public class DMDialect implements Dialect {
 			sql.append(") SAG_Paginationtable ");
 		}
 		sql.append(" offset ");
-		sql.append(sqlToyConfig.isNamedParam() ? ":" + SqlToyConstants.PAGE_FIRST_PARAM_NAME : "?");
+		sql.append(isNamed ? ":" + SqlToyConstants.PAGE_FIRST_PARAM_NAME : "?");
 		sql.append(" rows fetch next ");
-		sql.append(sqlToyConfig.isNamedParam() ? ":" + SqlToyConstants.PAGE_LAST_PARAM_NAME : "?");
+		sql.append(isNamed ? ":" + SqlToyConstants.PAGE_LAST_PARAM_NAME : "?");
 		sql.append(" rows only ");
 		if (sqlToyConfig.isHasFast()) {
 			sql.append(") ").append(sqlToyConfig.getFastTailSql(dialect));
@@ -237,12 +234,12 @@ public class DMDialect implements Dialect {
 				reflectPropertyHandler, NVL_FUNCTION, conn, dbType, autoCommit, tableName, true);
 		// 如果修改的记录数量跟总记录数量一致,表示全部是修改
 		if (updateCnt >= entities.size()) {
-			logger.debug("修改记录数为:{}", updateCnt);
+			SqlExecuteStat.debug("修改记录", "修改记录量:" + updateCnt + " 条!");
 			return updateCnt;
 		}
 		Long saveCnt = saveAllIgnoreExist(sqlToyContext, entities, batchSize, reflectPropertyHandler, conn, dbType,
 				dialect, autoCommit, tableName);
-		logger.debug("变更记录数:{},新建记录数为:{}", updateCnt, saveCnt);
+		SqlExecuteStat.debug("新增记录", "新建记录数量:" + saveCnt + " 条!");
 		return updateCnt + saveCnt;
 	}
 
@@ -268,7 +265,7 @@ public class DMDialect implements Dialect {
 							pkStrategy = PKStrategy.SEQUENCE;
 							sequence = entityMeta.getFieldsMeta().get(entityMeta.getIdArray()[0]).getDefaultValue();
 						}
-						return DialectUtils.getSaveIgnoreExistSql(dbType, entityMeta, pkStrategy, "dual", NVL_FUNCTION,
+						return DialectExtUtils.getSaveIgnoreExistSql(dbType, entityMeta, pkStrategy, "dual", NVL_FUNCTION,
 								sequence, DMDialectUtils.isAssignPKValue(pkStrategy), tableName);
 					}
 				}, reflectPropertyHandler, conn, dbType, autoCommit);

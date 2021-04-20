@@ -3,17 +3,17 @@
  */
 package org.sagacity.sqltoy.config.model;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-
 import org.sagacity.sqltoy.plugins.function.FunctionUtils;
 import org.sagacity.sqltoy.utils.DataSourceUtils;
 import org.sagacity.sqltoy.utils.DataSourceUtils.Dialect;
 import org.sagacity.sqltoy.utils.ReservedWordsUtil;
 import org.sagacity.sqltoy.utils.StringUtil;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @project sqltoy-orm
@@ -24,7 +24,7 @@ import org.sagacity.sqltoy.utils.StringUtil;
  *         2、translateMap也实例化,便于后续处理 3、resultProcessor 也实例化非空集合
  */
 @SuppressWarnings({ "rawtypes" })
-public class SqlToyConfig implements Serializable, java.lang.Cloneable {
+public class SqlToyConfig implements Serializable, Cloneable {
 	/**
 	 * 
 	 */

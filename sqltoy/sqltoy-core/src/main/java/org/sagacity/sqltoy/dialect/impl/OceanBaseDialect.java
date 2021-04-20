@@ -1,16 +1,10 @@
 package org.sagacity.sqltoy.dialect.impl;
 
-import java.io.Serializable;
-import java.sql.Connection;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-
+import org.sagacity.sqltoy.SqlExecuteStat;
 import org.sagacity.sqltoy.SqlToyConstants;
 import org.sagacity.sqltoy.SqlToyContext;
 import org.sagacity.sqltoy.callback.ReflectPropertyHandler;
 import org.sagacity.sqltoy.callback.RowCallbackHandler;
-import org.sagacity.sqltoy.callback.UniqueSqlHandler;
 import org.sagacity.sqltoy.callback.UpdateRowHandler;
 import org.sagacity.sqltoy.config.model.EntityMeta;
 import org.sagacity.sqltoy.config.model.PKStrategy;
@@ -33,6 +27,12 @@ import org.sagacity.sqltoy.utils.SqlUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
+import java.sql.Connection;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
 /**
  * @project sqltoy-orm
  * @description 提供适配OceanBaseDialect数据库方言的实现(类似于oracle12+)
@@ -54,15 +54,11 @@ public class OceanBaseDialect implements Dialect {
 
 	@Override
 	public boolean isUnique(SqlToyContext sqlToyContext, Serializable entity, String[] paramsNamed, Connection conn,
-			Integer dbType, String tableName) {
+			final Integer dbType, String tableName) {
 		return DialectUtils.isUnique(sqlToyContext, entity, paramsNamed, conn, dbType, tableName,
-				new UniqueSqlHandler() {
-					@Override
-					public String process(EntityMeta entityMeta, String[] realParamNamed, String tableName,
-							Integer dbType, int topSize) {
-						String queryStr = DialectExtUtils.wrapUniqueSql(entityMeta, realParamNamed, dbType, tableName);
-						return queryStr + " fetch first " + topSize + " rows only";
-					}
+				(entityMeta, realParamNamed, table, topSize) -> {
+					String queryStr = DialectExtUtils.wrapUniqueSql(entityMeta, realParamNamed, dbType, table);
+					return queryStr + " fetch first " + topSize + " rows only";
 				});
 	}
 
@@ -97,6 +93,7 @@ public class OceanBaseDialect implements Dialect {
 			QueryExecutor queryExecutor, Long pageNo, Integer pageSize, Connection conn, final Integer dbType,
 			final String dialect) throws Exception {
 		StringBuilder sql = new StringBuilder();
+		boolean isNamed = sqlToyConfig.isNamedParam();
 		// 是否有order by,update 2017-5-22
 		boolean hasOrderBy = SqlUtil.hasOrderBy(
 				sqlToyConfig.isHasFast() ? sqlToyConfig.getFastSql(dialect) : sqlToyConfig.getSql(dialect), true);
@@ -112,9 +109,9 @@ public class OceanBaseDialect implements Dialect {
 			sql.append(") SAG_Paginationtable ");
 		}
 		sql.append(" offset ");
-		sql.append(sqlToyConfig.isNamedParam() ? ":" + SqlToyConstants.PAGE_FIRST_PARAM_NAME : "?");
+		sql.append(isNamed ? ":" + SqlToyConstants.PAGE_FIRST_PARAM_NAME : "?");
 		sql.append(" rows fetch next ");
-		sql.append(sqlToyConfig.isNamedParam() ? ":" + SqlToyConstants.PAGE_LAST_PARAM_NAME : "?");
+		sql.append(isNamed ? ":" + SqlToyConstants.PAGE_LAST_PARAM_NAME : "?");
 		sql.append(" rows only ");
 		if (sqlToyConfig.isHasFast()) {
 			sql.append(") ").append(sqlToyConfig.getFastTailSql(dialect));
@@ -236,12 +233,12 @@ public class OceanBaseDialect implements Dialect {
 				reflectPropertyHandler, NVL_FUNCTION, conn, dbType, autoCommit, tableName, true);
 		// 如果修改的记录数量跟总记录数量一致,表示全部是修改
 		if (updateCnt >= entities.size()) {
-			logger.debug("修改记录数为:{}", updateCnt);
+			SqlExecuteStat.debug("修改记录", "修改记录量:" + updateCnt + " 条!");
 			return updateCnt;
 		}
 		Long saveCnt = saveAllIgnoreExist(sqlToyContext, entities, batchSize, reflectPropertyHandler, conn, dbType,
 				dialect, autoCommit, tableName);
-		logger.debug("变更记录数:{},新建记录数为:{}", updateCnt, saveCnt);
+		SqlExecuteStat.debug("新增记录", "新建记录数量:" + saveCnt + " 条!");
 		return updateCnt + saveCnt;
 	}
 
@@ -267,8 +264,8 @@ public class OceanBaseDialect implements Dialect {
 							pkStrategy = PKStrategy.SEQUENCE;
 							sequence = entityMeta.getFieldsMeta().get(entityMeta.getIdArray()[0]).getDefaultValue();
 						}
-						return DialectUtils.getSaveIgnoreExistSql(dbType, entityMeta, pkStrategy, "dual", NVL_FUNCTION,
-								sequence, isAssignPKValue(pkStrategy), tableName);
+						return DialectExtUtils.getSaveIgnoreExistSql(dbType, entityMeta, pkStrategy, "dual",
+								NVL_FUNCTION, sequence, OracleDialectUtils.isAssignPKValue(pkStrategy), tableName);
 					}
 				}, reflectPropertyHandler, conn, dbType, autoCommit);
 	}
@@ -316,8 +313,8 @@ public class OceanBaseDialect implements Dialect {
 			sequence = entityMeta.getFieldsMeta().get(entityMeta.getIdArray()[0]).getDefaultValue();
 		}
 		String insertSql = DialectExtUtils.generateInsertSql(dbType, entityMeta, pkStrategy, NVL_FUNCTION, sequence,
-				isAssignPKValue(pkStrategy), tableName);
-		return DialectUtils.save(sqlToyContext, entityMeta, pkStrategy, isAssignPKValue(pkStrategy),
+				OracleDialectUtils.isAssignPKValue(pkStrategy), tableName);
+		return DialectUtils.save(sqlToyContext, entityMeta, pkStrategy, OracleDialectUtils.isAssignPKValue(pkStrategy),
 				ReturnPkType.PREPARD_ID, insertSql, entity, new GenerateSqlHandler() {
 					public String generateSql(EntityMeta entityMeta, String[] forceUpdateField) {
 						PKStrategy pkStrategy = entityMeta.getIdStrategy();
@@ -327,7 +324,7 @@ public class OceanBaseDialect implements Dialect {
 							sequence = entityMeta.getFieldsMeta().get(entityMeta.getIdArray()[0]).getDefaultValue();
 						}
 						return DialectExtUtils.generateInsertSql(dbType, entityMeta, pkStrategy, NVL_FUNCTION, sequence,
-								isAssignPKValue(pkStrategy), null);
+								OracleDialectUtils.isAssignPKValue(pkStrategy), null);
 					}
 				}, new GenerateSavePKStrategy() {
 					public SavePKStrategy generate(EntityMeta entityMeta) {
@@ -335,7 +332,7 @@ public class OceanBaseDialect implements Dialect {
 						if (pkStrategy != null && pkStrategy.equals(PKStrategy.IDENTITY)) {
 							pkStrategy = PKStrategy.SEQUENCE;
 						}
-						return new SavePKStrategy(pkStrategy, isAssignPKValue(pkStrategy));
+						return new SavePKStrategy(pkStrategy, OracleDialectUtils.isAssignPKValue(pkStrategy));
 					}
 				}, conn, dbType);
 	}
@@ -360,9 +357,10 @@ public class OceanBaseDialect implements Dialect {
 			sequence = entityMeta.getFieldsMeta().get(entityMeta.getIdArray()[0]).getDefaultValue();
 		}
 		String insertSql = DialectExtUtils.generateInsertSql(dbType, entityMeta, pkStrategy, NVL_FUNCTION, sequence,
-				isAssignPKValue(pkStrategy), tableName);
-		return DialectUtils.saveAll(sqlToyContext, entityMeta, pkStrategy, isAssignPKValue(pkStrategy), insertSql,
-				entities, batchSize, reflectPropertyHandler, conn, dbType, autoCommit);
+				OracleDialectUtils.isAssignPKValue(pkStrategy), tableName);
+		return DialectUtils.saveAll(sqlToyContext, entityMeta, pkStrategy,
+				OracleDialectUtils.isAssignPKValue(pkStrategy), insertSql, entities, batchSize, reflectPropertyHandler,
+				conn, dbType, autoCommit);
 	}
 
 	/*
@@ -387,7 +385,7 @@ public class OceanBaseDialect implements Dialect {
 							sequence = entityMeta.getFieldsMeta().get(entityMeta.getIdArray()[0]).getDefaultValue();
 						}
 						return DialectUtils.getSaveOrUpdateSql(dbType, entityMeta, pkStrategy, forceUpdateFields,
-								"dual", NVL_FUNCTION, sequence, isAssignPKValue(pkStrategy), null);
+								"dual", NVL_FUNCTION, sequence, OracleDialectUtils.isAssignPKValue(pkStrategy), null);
 					}
 				}, forceCascadeClass, subTableForceUpdateProps, conn, dbType, tableName);
 	}
@@ -497,10 +495,6 @@ public class OceanBaseDialect implements Dialect {
 			final String dialect) throws Exception {
 		return OracleDialectUtils.executeStore(sqlToyConfig, sqlToyContext, sql, inParamsValue, outParamsType, conn,
 				dbType);
-	}
-
-	private boolean isAssignPKValue(PKStrategy pkStrategy) {
-		return true;
 	}
 
 }

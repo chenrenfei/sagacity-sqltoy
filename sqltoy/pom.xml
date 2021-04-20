@@ -5,14 +5,10 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.sagframe</groupId>
     <artifactId>sqltoy</artifactId>
-    <version>v0.0.1</version>
+    <version>0.0.4-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <properties>
-<!--        <project-artifactId>sqltoy</project-artifactId>-->
-<!--        <project-groupId>com.sagframe</project-groupId>-->
-<!--        <project-version>0.0.1-Release</project-version>-->
-
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
@@ -31,10 +27,8 @@
         <mongo.version>3.12.7</mongo.version>
         <spring-data-redis.version>2.3.2.RELEASE</spring-data-redis.version>
         <spring-data-mongo.version>3.0.2.RELEASE</spring-data-mongo.version>
-
         <postgresql.version>42.2.11</postgresql.version>
     </properties>
-
 
     <build>
         <plugins>
@@ -224,12 +218,14 @@
         <repository>
             <id>releases</id>
             <name>Local Nexus Repository</name>
-            <url>http://maven.loverno.com/nexus/content/repositories/releases</url>
+            <!--            <url>http://maven.bienei.com/repository/maven-releases/</url>-->
+            <url>http://192.168.2.62:8081/nexus/content/repositories/releases/</url>
         </repository>
         <snapshotRepository>
             <id>snapshots</id>
             <name>Local Nexus Repository</name>
-            <url>http://maven.loverno.com/nexus/content/repositories/snapshots</url>
+            <!--            <url>http://maven.bienei.com/repository/maven-snapshots/</url>-->
+            <url>http://192.168.2.62:8081/nexus/content/repositories/snapshots/</url>
         </snapshotRepository>
     </distributionManagement>
 </project>

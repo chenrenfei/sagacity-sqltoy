@@ -360,26 +360,54 @@ public class SqlToyContext {
     }
 
     public SqlToyConfig getSqlToyConfig(String sqlKey) {
-        return getSqlToyConfig(sqlKey, SqlType.search);
+//        return getSqlToyConfig(sqlKey, SqlType.search);
+        return getSqlToyConfig(sqlKey, SqlType.search, (getDialect() == null) ? "" : getDialect());
     }
+
+//    /**
+//     * @param sqlKey
+//     * @param type
+//     * @return
+//     * @todo 获取sql对应的配置模型(请阅读scriptLoader, 硬code的sql对应模型也利用了内存来存放非每次都动态构造对象)
+//     */
+//    public SqlToyConfig getSqlToyConfig(String sqlKey, SqlType type) {
+//        return scriptLoader.getSqlConfig(sqlKey, type);
+//    }
+//
+//    public SqlToyConfig getSqlToyConfig(QueryExecutor queryExecutor, SqlType type) {
+//        String sqlKey = queryExecutor.getInnerModel().sql;
+//        // 查询语句补全select * from table,避免一些sql直接从from 开始
+//        if (SqlType.search.equals(type) && queryExecutor.getInnerModel().resultType != null) {
+//            sqlKey = SqlUtil.completionSql(this, (Class) queryExecutor.getInnerModel().resultType, sqlKey);
+//        }
+//        return scriptLoader.getSqlConfig(sqlKey, type);
+//    }
 
     /**
+     * @todo 获取sql对应的配置模型(请阅读scriptLoader,硬code的sql对应模型也利用了内存来存放非每次都动态构造对象)
      * @param sqlKey
-     * @param type
+     * @param sqlType
+     * @param dialect
      * @return
-     * @todo 获取sql对应的配置模型(请阅读scriptLoader, 硬code的sql对应模型也利用了内存来存放非每次都动态构造对象)
      */
-    public SqlToyConfig getSqlToyConfig(String sqlKey, SqlType type) {
-        return scriptLoader.getSqlConfig(sqlKey, type);
+    public SqlToyConfig getSqlToyConfig(String sqlKey, SqlType sqlType, String dialect) {
+        return scriptLoader.getSqlConfig(sqlKey, sqlType, dialect);
     }
 
-    public SqlToyConfig getSqlToyConfig(QueryExecutor queryExecutor, SqlType type) {
+    public SqlToyConfig getSqlToyConfig(QueryExecutor queryExecutor, SqlType sqlType, String dialect) {
         String sqlKey = queryExecutor.getInnerModel().sql;
         // 查询语句补全select * from table,避免一些sql直接从from 开始
-        if (SqlType.search.equals(type) && queryExecutor.getInnerModel().resultType != null) {
+        if (SqlType.search.equals(sqlType) && queryExecutor.getInnerModel().resultType != null) {
             sqlKey = SqlUtil.completionSql(this, (Class) queryExecutor.getInnerModel().resultType, sqlKey);
         }
-        return scriptLoader.getSqlConfig(sqlKey, type);
+        SqlToyConfig result = scriptLoader.getSqlConfig(sqlKey, sqlType, dialect);
+        // 剔除空白转null的默认设置
+        if (!queryExecutor.getInnerModel().blankToNull && StringUtil.isBlank(result.getId())) {
+            if (result.getFilters().size() == 1) {
+                result.getFilters().remove(0);
+            }
+        }
+        return result;
     }
 
     // 设置workerId和dataCenterId,当没有通过配置文件指定workerId时通过IP来自动分配

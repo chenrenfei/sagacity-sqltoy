@@ -13,7 +13,10 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
+import org.sagacity.sqltoy.callback.TreeIdAndPidGet;
+import org.sagacity.sqltoy.model.NamedValuesModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +33,11 @@ public class CollectionUtil {
 	 * 定义日志
 	 */
 	private final static Logger logger = LoggerFactory.getLogger(CollectionUtil.class);
+
+	//静态方法避免实例化和继承
+	private CollectionUtil() {
+
+	}
 
 	/**
 	 * @todo 转换数组类型数据为对象数组,解决原始类型无法强制转换的问题
@@ -195,9 +203,9 @@ public class CollectionUtil {
 			Object jData;
 			// 1:string,2:数字;3:日期
 			Integer dataType = 1;
-			if (aryData[0] instanceof java.util.Date) {
+			if (aryData[0] instanceof Date) {
 				dataType = 3;
-			} else if (aryData[0] instanceof java.lang.Number) {
+			} else if (aryData[0] instanceof Number) {
 				dataType = 2;
 			}
 			boolean lessThen = false;
@@ -220,6 +228,61 @@ public class CollectionUtil {
 				}
 			}
 		}
+	}
+
+	/**
+	 * @todo 处理树形数据，将子节点紧靠父节点排序
+	 * @param treeList
+	 * @param treeIdAndPidGet
+	 * @param pids
+	 * @return
+	 */
+	public static List sortTreeList(List treeList, TreeIdAndPidGet treeIdAndPidGet, Object... pids) {
+		if (treeList == null || treeList.isEmpty() || pids == null || pids.length == 0) {
+			return treeList;
+		}
+		int totalRecord = treeList.size();
+		// 支持多根节点
+		List result = new ArrayList();
+		Object row;
+		Object pid;
+		for (int i = 0; i < treeList.size(); i++) {
+			row = treeList.get(i);
+			pid = treeIdAndPidGet.getIdAndPid(row)[1];
+			if (any(pid, pids)) {
+				result.add(row);
+				treeList.remove(i);
+				i--;
+			}
+		}
+		if (result.isEmpty()) {
+			throw new IllegalArgumentException("排序树形数据集合中没有对应的父ids:" + StringUtil.linkAry(",", false, pids));
+		}
+		int beginIndex = 0;
+		int addCount = 0;
+		Object compareId;
+		while (treeList.size() != 0) {
+			addCount = 0;
+			compareId = treeIdAndPidGet.getIdAndPid(result.get(beginIndex))[0];
+			for (int i = 0; i < treeList.size(); i++) {
+				if (BeanUtil.equalsIgnoreType(treeIdAndPidGet.getIdAndPid(treeList.get(i))[1], compareId, false)) {
+					result.add(beginIndex + addCount + 1, treeList.get(i));
+					treeList.remove(i);
+					addCount++;
+					i--;
+				}
+			}
+			// 下一个
+			beginIndex++;
+			// 防止因数据不符合规则造成的死循环
+			if (beginIndex + 1 > result.size()) {
+				break;
+			}
+		}
+		if (result.size() != totalRecord) {
+			logger.error("sortTreeList操作发现部分数据不符合树形结构规则,请检查!");
+		}
+		return result;
 	}
 
 	/**
@@ -336,17 +399,15 @@ public class CollectionUtil {
 
 	/**
 	 * @todo 集合进行数据旋转
-	 * @Modification $Date:2011-8-11 修改了设置初始值的bug
 	 * @param data
 	 * @param categorys
-	 * @param categCol
+	 * @param categoryCol
 	 * @param pkColumns
 	 * @param categCompareCol
 	 * @param startCol
 	 * @param endCol
 	 * @param defaultValue
 	 * @return
-	 * @throws Exception
 	 */
 	public static List pivotList(List data, List categorys, Integer[] categoryCol, Integer[] pkColumns,
 			Integer[] categCompareCol, int startCol, int endCol, Object defaultValue) {
@@ -674,14 +735,15 @@ public class CollectionUtil {
 	/**
 	 * @todo 分组合计
 	 * @param sumData
-	 * @param groupIndexs   {汇总列，汇总标题，平均标题，汇总相对平均的位置(left/right/top/bottom)}
+	 * @param groupIndexs  {汇总列，汇总标题，平均标题，汇总相对平均的位置(left/right/top/bottom)}
 	 * @param sumColumns
 	 * @param globalSumSite 存在全局汇总时，总计标题存放的列
 	 * @param totalLabel
 	 * @param hasAverage
 	 * @param averageLabel
-	 * @param averageFormat
+	 * @param radixSize
 	 * @param sumRecordSite
+	 * @param totalSumReverse
 	 */
 	public static void groupSummary(List sumData, Object[][] groupIndexs, Integer[] sumColumns, int globalSumSite,
 			String totalLabel, boolean hasAverage, String averageLabel, int radixSize, String sumRecordSite,
@@ -798,18 +860,18 @@ public class CollectionUtil {
 			}
 		}
 	}
-
+	
 	/**
 	 * @todo 逆向分组合计
 	 * @param sumData
 	 * @param groupIndexs
 	 * @param sumColumns
-	 * @param totalColumnIndex
-	 * @param totalTitle
+	 * @param globalSumSite
+	 * @param totalLabel
 	 * @param hasAverage
-	 * @param averageTitle
-	 * @param radixSize        小数位长度
-	 * @param firstSummary
+	 * @param averageLabel
+	 * @param radixSize 小数位长度
+	 * @param sumRecordSite
 	 */
 	public static void groupReverseSummary(List sumData, Object[][] groupIndexs, Integer[] sumColumns,
 			int globalSumSite, String totalLabel, boolean hasAverage, String averageLabel, int radixSize,
@@ -1204,5 +1266,31 @@ public class CollectionUtil {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * @TODO 循环将map转换为names和values数组对象
+	 * @param paramsMap
+	 * @return
+	 */
+	public static NamedValuesModel mapToNamedValues(Map<String, Object> paramsMap) {
+		NamedValuesModel result = new NamedValuesModel();
+		if (paramsMap == null || paramsMap.isEmpty()) {
+			return result;
+		}
+		String[] names = new String[paramsMap.size()];
+		Object[] values = new Object[paramsMap.size()];
+		Iterator<Entry<String, Object>> iter = paramsMap.entrySet().iterator();
+		int i = 0;
+		Entry<String, Object> entry;
+		while (iter.hasNext()) {
+			entry = iter.next();
+			names[i] = entry.getKey();
+			values[i] = entry.getValue();
+			i++;
+		}
+		result.setNames(names);
+		result.setValues(values);
+		return result;
 	}
 }

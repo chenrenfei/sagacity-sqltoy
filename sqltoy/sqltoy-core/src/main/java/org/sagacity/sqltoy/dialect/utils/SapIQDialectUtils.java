@@ -3,15 +3,6 @@
  */
 package org.sagacity.sqltoy.dialect.utils;
 
-import java.io.IOException;
-import java.io.Serializable;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
-
 import org.sagacity.sqltoy.SqlExecuteStat;
 import org.sagacity.sqltoy.SqlToyContext;
 import org.sagacity.sqltoy.callback.PreparedStatementResultHandler;
@@ -26,6 +17,15 @@ import org.sagacity.sqltoy.utils.SqlUtilsExt;
 import org.sagacity.sqltoy.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.Serializable;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @project sqltoy-orm
@@ -115,7 +115,7 @@ public class SapIQDialectUtils {
 		if (isIdentity) {
 			insertSql = insertSql + " select @@IDENTITY ";
 		}
-		SqlExecuteStat.showSql("save insertSql=" + insertSql, null);
+		SqlExecuteStat.showSql("执行iq插入", insertSql, null);
 		final String realInsertSql = insertSql;
 		PreparedStatement pst = null;
 		Object result = SqlUtil.preparedStatementProcess(null, pst, null, new PreparedStatementResultHandler() {
@@ -194,7 +194,7 @@ public class SapIQDialectUtils {
 			insertSql = "DECLARE @mySeqVariable decimal(20) select @mySeqVariable=" + entityMeta.getSequence()
 					+ ".NEXTVAL " + insertSql;
 		}
-		SqlExecuteStat.showSql("saveAll insertSql=" + insertSql, null);
+		SqlExecuteStat.showSql("IQ批量插入", insertSql, null);
 		return saveAll(sqlToyContext, entityMeta, entityMeta.getIdStrategy(), false, insertSql, entities, batchSize,
 				reflectPropertyHandler, conn, dbType);
 	}
@@ -278,7 +278,7 @@ public class SapIQDialectUtils {
 				BeanUtil.mappingSetProperties(entities, entityMeta.getIdArray(), idSet, new int[] { 0 }, true);
 			}
 		}
-		SqlExecuteStat.showSql("saveAll insertSql=" + insertSql, null);
+		SqlExecuteStat.showSql("IQ批量插入", insertSql, null);
 		return SqlUtilsExt.batchUpdateByJdbc(insertSql, paramValues, entityMeta.getFieldsTypeArray(),
 				entityMeta.getFieldsDefaultValue(), entityMeta.getFieldsNullable(), batchSize, null, conn, dbType);
 	}

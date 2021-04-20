@@ -3,26 +3,20 @@
  */
 package org.sagacity.sqltoy.model;
 
+import org.sagacity.sqltoy.SqlToyContext;
+import org.sagacity.sqltoy.callback.ReflectPropertyHandler;
+import org.sagacity.sqltoy.callback.RowCallbackHandler;
+import org.sagacity.sqltoy.config.model.*;
+import org.sagacity.sqltoy.utils.BeanUtil;
+import org.sagacity.sqltoy.utils.ParamFilterUtils;
+
+import javax.sql.DataSource;
 import java.io.Serializable;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-
-import javax.sql.DataSource;
-
-import org.sagacity.sqltoy.SqlToyContext;
-import org.sagacity.sqltoy.callback.ReflectPropertyHandler;
-import org.sagacity.sqltoy.callback.RowCallbackHandler;
-import org.sagacity.sqltoy.config.SqlConfigParseUtils;
-import org.sagacity.sqltoy.config.model.FormatModel;
-import org.sagacity.sqltoy.config.model.PageOptimize;
-import org.sagacity.sqltoy.config.model.ParamFilterModel;
-import org.sagacity.sqltoy.config.model.SecureMask;
-import org.sagacity.sqltoy.config.model.SqlToyConfig;
-import org.sagacity.sqltoy.config.model.Translate;
-import org.sagacity.sqltoy.utils.ParamFilterUtils;
 
 /**
  * @project sqltoy-orm
@@ -81,6 +75,7 @@ public class QueryExecutorExtend implements Serializable {
 	/**
 	 * 查询属性值反射处理
 	 */
+	@Deprecated
 	public ReflectPropertyHandler reflectPropertyHandler;
 
 	/**
@@ -127,6 +122,16 @@ public class QueryExecutorExtend implements Serializable {
 	 * 分页优化模型
 	 */
 	public PageOptimize pageOptimize;
+
+	/**
+	 * 空白字符转为null，默认为true
+	 */
+	public boolean blankToNull = true;
+
+	/**
+	 * 锁表
+	 */
+	public LockMode lockMode = null;
 
 	// 分库分表策略配置
 	// public ShardingConfig shardingConfig = new ShardingConfig();
@@ -185,7 +190,7 @@ public class QueryExecutorExtend implements Serializable {
 		// 是否萃取过
 		if (!extracted) {
 			if (entity != null) {
-				paramsValue = SqlConfigParseUtils.reflectBeanParams(sqlToyConfig.getFullParamNames(), entity,
+				paramsValue = BeanUtil.reflectBeanToAry(entity, sqlToyConfig.getFullParamNames(), null,
 						reflectPropertyHandler);
 			}
 			extracted = true;
@@ -216,7 +221,7 @@ public class QueryExecutorExtend implements Serializable {
 	 */
 	public Object[] getTableShardingParamsValue(SqlToyConfig sqlToyConfig) throws Exception {
 		if (entity != null) {
-			return SqlConfigParseUtils.reflectBeanParams(sqlToyConfig.getTableShardingParams(), entity,
+			return BeanUtil.reflectBeanToAry(entity, sqlToyConfig.getTableShardingParams(), null,
 					reflectPropertyHandler);
 		}
 		return shardingParamsValue;
@@ -230,7 +235,7 @@ public class QueryExecutorExtend implements Serializable {
 	 */
 	public Object[] getDataSourceShardingParamsValue(SqlToyConfig sqlToyConfig) throws Exception {
 		if (entity != null) {
-			return SqlConfigParseUtils.reflectBeanParams(sqlToyConfig.getDataSourceShardingParams(), entity,
+			return BeanUtil.reflectBeanToAry(entity, sqlToyConfig.getDataSourceShardingParams(), null,
 					reflectPropertyHandler);
 		}
 		return shardingParamsValue;

@@ -464,6 +464,8 @@ public interface SqlToyCoreLazyDao {
 	 * 数据库回滚
 	 */
 	public void rollback();
+
+	public void closeConnection();
 	/**
 	 * 删除操作集合
 	 * 

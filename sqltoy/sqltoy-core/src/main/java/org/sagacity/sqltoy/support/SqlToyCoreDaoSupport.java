@@ -139,7 +139,7 @@ public class SqlToyCoreDaoSupport {
      * @todo 获取sqlId 在sqltoy中的配置模型
      */
     protected SqlToyConfig getSqlToyConfig(final String sqlKey, final SqlType sqlType) {
-        return sqlToyContext.getSqlToyConfig(sqlKey, sqlType);
+        return sqlToyContext.getSqlToyConfig(sqlKey, sqlType, getDialect(null));
     }
 
     /**
@@ -181,7 +181,8 @@ public class SqlToyCoreDaoSupport {
      */
     protected Long getCountByQuery(final QueryExecutor queryExecutor) {
         QueryExecutorExtend extend = queryExecutor.getInnerModel();
-        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(extend.sql, SqlType.search);
+        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(extend.sql, SqlType.search,
+                getDialect(queryExecutor.getInnerModel().dataSource));
         return dialectFactory.getCountBySql(sqlToyContext, queryExecutor, sqlToyConfig,
                 this.getDataSource(extend.dataSource, sqlToyConfig));
     }
@@ -360,7 +361,8 @@ public class SqlToyCoreDaoSupport {
      */
     protected Object loadByQuery(final QueryExecutor queryExecutor) {
         QueryExecutorExtend extend = queryExecutor.getInnerModel();
-        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor, SqlType.search);
+        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor, SqlType.search,
+                getDialect(queryExecutor.getInnerModel().dataSource));
         QueryResult result = dialectFactory.findByQuery(sqlToyContext, queryExecutor, sqlToyConfig, null,
                 this.getDataSource(extend.dataSource, sqlToyConfig));
         List rows = result.getRows();
@@ -371,61 +373,67 @@ public class SqlToyCoreDaoSupport {
     }
 
     /**
+     * @todo 执行无条件的sql语句,一般是一个修改、删除等操作，并返回修改的记录数量
      * @param sqlOrNamedSql
      * @return
-     * @todo 执行无条件的sql语句, 一般是一个修改、删除等操作，并返回修改的记录数量
      */
     protected Long executeSql(final String sqlOrNamedSql) {
         return executeSql(sqlOrNamedSql, null, null, false, null);
     }
 
     /**
+     * @todo 解析sql中的参数名称，以此名称到entity中提取对应的值作为查询条件值执行sql
      * @param sqlOrNamedSql
      * @param entity
-     * @param reflectPropertyHandler
+     * @param reflectPropertyHandler 用来批量设置某个属性的值,一般设置为null即可
      * @return
-     * @todo 解析sql中的参数名称，以此名称到entity中提取对应的值作为查询条件值执行sql
      */
     protected Long executeSql(final String sqlOrNamedSql, final Serializable entity,
                               final ReflectPropertyHandler reflectPropertyHandler) {
         SqlToyConfig sqlToyConfig = getSqlToyConfig(sqlOrNamedSql, SqlType.update);
         // 根据sql中的变量从entity对象中提取参数值
-        Object[] paramValues = SqlConfigParseUtils.reflectBeanParams(sqlToyConfig.getParamsName(), entity,
+        Object[] paramValues = BeanUtil.reflectBeanToAry(entity, sqlToyConfig.getParamsName(), null,
                 reflectPropertyHandler);
         return executeSql(sqlOrNamedSql, sqlToyConfig.getParamsName(), paramValues, false, null);
     }
 
+    protected Long executeSql(final String sqlOrNamedSql, final Map<String, Object> paramsMap) {
+        NamedValuesModel model = CollectionUtil.mapToNamedValues(paramsMap);
+        return executeSql(sqlOrNamedSql, model.getNames(), model.getValues(), false, null);
+    }
+
     /**
+     * @todo 执行无返回结果的SQL(返回updateCount)
      * @param sqlOrNamedSql
      * @param paramsNamed
      * @param paramsValue
-     * @todo 执行无返回结果的SQL(返回updateCount)
      */
     protected Long executeSql(final String sqlOrNamedSql, final String[] paramsNamed, final Object[] paramsValue) {
         return executeSql(sqlOrNamedSql, paramsNamed, paramsValue, false, null);
     }
 
     /**
+     * @todo 执行无返回结果的SQL(返回updateCount),根据autoCommit设置是否自动提交
      * @param sqlOrNamedSql
      * @param paramsNamed
      * @param paramsValue
      * @param autoCommit    是否自动提交
      * @param dataSource
-     * @todo 执行无返回结果的SQL(返回updateCount), 根据autoCommit设置是否自动提交
      */
     protected Long executeSql(final String sqlOrNamedSql, final String[] paramsNamed, final Object[] paramsValue,
                               final Boolean autoCommit, final DataSource dataSource) {
-        final SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sqlOrNamedSql, SqlType.update);
+        final SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sqlOrNamedSql, SqlType.update,
+                getDialect(dataSource));
         return dialectFactory.executeSql(sqlToyContext, sqlToyConfig, paramsNamed, paramsValue, autoCommit,
                 this.getDataSource(dataSource, sqlToyConfig));
     }
 
     /**
+     * @todo 批量执行sql修改或删除操作(返回updateCount)
      * @param sqlOrNamedSql
      * @param dataSet
      * @param reflectPropertyHandler 反调函数(一般不需要)
      * @param autoCommit
-     * @todo 批量执行sql修改或删除操作(返回updateCount)
      */
     protected Long batchUpdate(final String sqlOrNamedSql, final List dataSet,
                                final ReflectPropertyHandler reflectPropertyHandler, final Boolean autoCommit) {
@@ -436,12 +444,12 @@ public class SqlToyCoreDaoSupport {
     }
 
     /**
+     * @TODO 批量执行sql修改或删除操作(返回updateCount)
      * @param sqlOrNamedSql
      * @param dataSet
      * @param reflectPropertyHandler
      * @param insertCallhandler
      * @param autoCommit
-     * @TODO 批量执行sql修改或删除操作(返回updateCount)
      */
     protected Long batchUpdate(final String sqlOrNamedSql, final List dataSet,
                                final ReflectPropertyHandler reflectPropertyHandler, final InsertRowCallbackHandler insertCallhandler,
@@ -451,12 +459,12 @@ public class SqlToyCoreDaoSupport {
     }
 
     /**
+     * @todo 通过jdbc方式批量插入数据，一般提供给数据采集时或插入临时表使用
      * @param sqlOrNamedSql
      * @param dataSet
      * @param batchSize
      * @param insertCallhandler
      * @param autoCommit
-     * @todo 通过jdbc方式批量插入数据，一般提供给数据采集时或插入临时表使用
      */
     protected Long batchUpdate(final String sqlOrNamedSql, final List dataSet, final int batchSize,
                                final InsertRowCallbackHandler insertCallhandler, final Boolean autoCommit) {
@@ -464,6 +472,7 @@ public class SqlToyCoreDaoSupport {
     }
 
     /**
+     * @todo 批量执行sql修改或删除操作
      * @param sqlOrNamedSql
      * @param dataSet
      * @param batchSize
@@ -471,12 +480,12 @@ public class SqlToyCoreDaoSupport {
      * @param insertCallhandler
      * @param autoCommit
      * @param dataSource
-     * @todo 批量执行sql修改或删除操作
      */
     protected Long batchUpdate(final String sqlOrNamedSql, final List dataSet, final int batchSize,
                                final ReflectPropertyHandler reflectPropertyHandler, final InsertRowCallbackHandler insertCallhandler,
                                final Boolean autoCommit, final DataSource dataSource) {
-        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sqlOrNamedSql, SqlType.update);
+        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sqlOrNamedSql, SqlType.update,
+                getDialect(dataSource));
         return dialectFactory.batchUpdate(sqlToyContext, sqlToyConfig, dataSet, batchSize, reflectPropertyHandler,
                 insertCallhandler, autoCommit, getDataSource(dataSource, sqlToyConfig));
     }
@@ -524,7 +533,8 @@ public class SqlToyCoreDaoSupport {
     }
 
     protected QueryResult findByQuery(final QueryExecutor queryExecutor) {
-        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor, SqlType.search);
+        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor, SqlType.search,
+                getDialect(queryExecutor.getInnerModel().dataSource));
         return dialectFactory.findByQuery(sqlToyContext, queryExecutor, sqlToyConfig, null,
                 this.getDataSource(queryExecutor.getInnerModel().dataSource, sqlToyConfig));
     }
@@ -536,7 +546,8 @@ public class SqlToyCoreDaoSupport {
      * @todo 以QueryExecutor 封装sql、参数等条件，实现分页查询
      */
     protected QueryResult findPageByQuery(final PaginationModel paginationModel, final QueryExecutor queryExecutor) {
-        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor, SqlType.search);
+        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor, SqlType.search,
+                getDialect(queryExecutor.getInnerModel().dataSource));
         // 跳过查询总记录数量
         if (paginationModel.getSkipQueryCount() != null && paginationModel.getSkipQueryCount()) {
             return dialectFactory.findSkipTotalCountPage(sqlToyContext, queryExecutor, sqlToyConfig,
@@ -595,7 +606,8 @@ public class SqlToyCoreDaoSupport {
     }
 
     protected QueryResult findTopByQuery(final QueryExecutor queryExecutor, final double topSize) {
-        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor, SqlType.search);
+        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor, SqlType.search,
+                getDialect(queryExecutor.getInnerModel().dataSource));
         return dialectFactory.findTop(sqlToyContext, queryExecutor, sqlToyConfig, topSize,
                 this.getDataSource(queryExecutor.getInnerModel().dataSource, sqlToyConfig));
     }
@@ -608,7 +620,8 @@ public class SqlToyCoreDaoSupport {
      * 如randomCount=0.05 总记录数为100,则随机取出5条记录
      */
     protected QueryResult getRandomResult(final QueryExecutor queryExecutor, final double randomCount) {
-        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor, SqlType.search);
+        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor, SqlType.search,
+                getDialect(queryExecutor.getInnerModel().dataSource));
         return dialectFactory.getRandomResult(sqlToyContext, queryExecutor, sqlToyConfig, randomCount,
                 this.getDataSource(queryExecutor.getInnerModel().dataSource, sqlToyConfig));
     }
@@ -887,12 +900,12 @@ public class SqlToyCoreDaoSupport {
     }
 
     /**
+     * @TODO 提供单表简易查询进行删除操作(删除操作filters过滤无效)
      * @param entityClass
      * @param entityQuery
      * @return
-     * @TODO 提供单表简易查询进行删除操作(删除操作filters过滤无效)
      */
-    public Long deleteByQuery(Class entityClass, EntityQuery entityQuery) {
+    protected Long deleteByQuery(Class entityClass, EntityQuery entityQuery) {
         EntityQueryExtend innerModel = entityQuery.getInnerModel();
         if (null == entityClass || null == entityQuery || StringUtil.isBlank(innerModel.where)
                 || StringUtil.isBlank(innerModel.values)) {
@@ -909,8 +922,8 @@ public class SqlToyCoreDaoSupport {
         if (SqlConfigParseUtils.hasNamedParam(where) && StringUtil.isBlank(innerModel.names)) {
             SqlToyConfig sqlToyConfig = getSqlToyConfig(sql, SqlType.update);
             // 根据sql中的变量从entity对象中提取参数值
-            Object[] paramValues = SqlConfigParseUtils.reflectBeanParams(sqlToyConfig.getParamsName(),
-                    (Serializable) innerModel.values[0], null);
+            Object[] paramValues = BeanUtil.reflectBeanToAry((Serializable) innerModel.values[0],
+                    sqlToyConfig.getParamsName(), null, null);
             return executeSql(sql, sqlToyConfig.getParamsName(), paramValues, false,
                     getDataSource(innerModel.dataSource));
         }
@@ -938,7 +951,8 @@ public class SqlToyCoreDaoSupport {
      * @todo 锁定记录查询，并对记录进行修改,最后将结果返回
      */
     protected List updateFetch(final QueryExecutor queryExecutor, final UpdateRowHandler updateRowHandler) {
-        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor.getInnerModel().sql, SqlType.search);
+        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor.getInnerModel().sql, SqlType.search,
+                getDialect(queryExecutor.getInnerModel().dataSource));
         return dialectFactory.updateFetch(sqlToyContext, queryExecutor, sqlToyConfig, updateRowHandler,
                 this.getDataSource(queryExecutor.getInnerModel().dataSource, sqlToyConfig)).getRows();
     }
@@ -953,7 +967,8 @@ public class SqlToyCoreDaoSupport {
     @Deprecated
     protected List updateFetchTop(final QueryExecutor queryExecutor, final Integer topSize,
                                   final UpdateRowHandler updateRowHandler) {
-        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor.getInnerModel().sql, SqlType.search);
+        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor.getInnerModel().sql, SqlType.search,
+                getDialect(queryExecutor.getInnerModel().dataSource));
         return dialectFactory.updateFetchTop(sqlToyContext, queryExecutor, sqlToyConfig, topSize, updateRowHandler,
                 this.getDataSource(queryExecutor.getInnerModel().dataSource, sqlToyConfig)).getRows();
     }
@@ -968,7 +983,8 @@ public class SqlToyCoreDaoSupport {
     @Deprecated
     protected List updateFetchRandom(final QueryExecutor queryExecutor, final Integer random,
                                      final UpdateRowHandler updateRowHandler) {
-        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor.getInnerModel().sql, SqlType.search);
+        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor.getInnerModel().sql, SqlType.search,
+                getDialect(queryExecutor.getInnerModel().dataSource));
         return dialectFactory.updateFetchRandom(sqlToyContext, queryExecutor, sqlToyConfig, random, updateRowHandler,
                 this.getDataSource(queryExecutor.getInnerModel().dataSource, sqlToyConfig)).getRows();
     }
@@ -1012,6 +1028,12 @@ public class SqlToyCoreDaoSupport {
         String connectionManagerName = this.sqlToyContext.getConnectionManagerName();
         ConnectionManager connectionManager = ConnectionManager.getConnectionManager(connectionManagerName);
         connectionManager.rollback();
+    }
+
+    protected void closeConnection(){
+        String connectionManagerName = this.sqlToyContext.getConnectionManagerName();
+        ConnectionManager connectionManager = ConnectionManager.getConnectionManager(connectionManagerName);
+        connectionManager.close();
     }
 
 //    protected void rollback(DataSource dataSource) {
@@ -1308,7 +1330,8 @@ public class SqlToyCoreDaoSupport {
         // 设置分页优化
         queryExecutor.getInnerModel().pageOptimize = innerModel.pageOptimize;
 
-        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor, SqlType.search);
+        SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(queryExecutor, SqlType.search,
+                getDialect(queryExecutor.getInnerModel().dataSource));
         // 分库分表策略
         if (entityMeta.getShardingConfig() != null) {
             // dataSource sharding
@@ -1433,5 +1456,17 @@ public class SqlToyCoreDaoSupport {
     public <T extends Serializable> List<T> convertType(List<Serializable> sourceList, Class<T> resultType)
             throws Exception {
         return MapperUtils.mapList(sqlToyContext, sourceList, resultType);
+    }
+
+    /**
+     * @TODO 获取当前数据库方言的名称
+     * @param dataSource
+     * @return
+     */
+    protected String getDialect(DataSource dataSource) {
+        if (StringUtil.isNotBlank(sqlToyContext.getDialect())) {
+            return sqlToyContext.getDialect();
+        }
+        return DataSourceUtils.getDialect(getDataSource(dataSource));
     }
 }

@@ -3,38 +3,21 @@
  */
 package org.sagacity.sqltoy.config;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
 import org.sagacity.sqltoy.SqlToyContext;
-import org.sagacity.sqltoy.config.annotation.BusinessId;
-import org.sagacity.sqltoy.config.annotation.Column;
-import org.sagacity.sqltoy.config.annotation.Entity;
-import org.sagacity.sqltoy.config.annotation.Id;
-import org.sagacity.sqltoy.config.annotation.ListSql;
-import org.sagacity.sqltoy.config.annotation.LoadSql;
-import org.sagacity.sqltoy.config.annotation.OneToMany;
-import org.sagacity.sqltoy.config.annotation.PaginationSql;
-import org.sagacity.sqltoy.config.annotation.Sharding;
-import org.sagacity.sqltoy.config.annotation.Strategy;
-import org.sagacity.sqltoy.config.model.EntityMeta;
-import org.sagacity.sqltoy.config.model.FieldMeta;
-import org.sagacity.sqltoy.config.model.OneToManyModel;
-import org.sagacity.sqltoy.config.model.PKStrategy;
-import org.sagacity.sqltoy.config.model.ShardingConfig;
-import org.sagacity.sqltoy.config.model.ShardingStrategyConfig;
+import org.sagacity.sqltoy.config.annotation.*;
+import org.sagacity.sqltoy.config.model.*;
 import org.sagacity.sqltoy.plugins.id.IdGenerator;
 //import org.sagacity.sqltoy.plugins.id.impl.RedisIdGenerator;
+import org.sagacity.sqltoy.utils.BeanUtil;
 import org.sagacity.sqltoy.utils.ReservedWordsUtil;
 import org.sagacity.sqltoy.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @project sagacity-sqltoy
@@ -117,10 +100,11 @@ public class EntityManager {
 	/**
 	 * @TODO 判断是否是实体对象
 	 * @param sqlToyContext
-	 * @param entityClass
+	 * @param voClass
 	 * @return
 	 */
-	public boolean isEntity(SqlToyContext sqlToyContext, Class entityClass) {
+	public boolean isEntity(SqlToyContext sqlToyContext, Class voClass) {
+		Class entityClass = BeanUtil.getEntityClass(voClass);
 		String className = entityClass.getName();
 		if (unEntityMap.contains(className)) {
 			return false;
@@ -128,7 +112,6 @@ public class EntityManager {
 		if (entitysMetaMap.contains(className)) {
 			return true;
 		}
-
 		EntityMeta entityMeta = parseEntityMeta(sqlToyContext, entityClass);
 		if (entityMeta != null) {
 			return true;
@@ -140,13 +123,14 @@ public class EntityManager {
 	/**
 	 * @todo <b>获取Entity类的对应数据库表信息，如：查询、修改、插入sql、对象属性跟表字段之间的关系等信息</b>
 	 * @param sqlToyContext
-	 * @param entityClass
+	 * @param voClass
 	 * @return
 	 */
-	public EntityMeta getEntityMeta(SqlToyContext sqlToyContext, Class entityClass) {
-		if (entityClass == null) {
+	public EntityMeta getEntityMeta(SqlToyContext sqlToyContext, Class voClass) {
+		if (voClass == null) {
 			return null;
 		}
+		Class entityClass = BeanUtil.getEntityClass(voClass);
 		String className = entityClass.getName();
 		EntityMeta entityMeta = entitysMetaMap.get(className);
 		// update 2017-11-27
@@ -226,7 +210,7 @@ public class EntityManager {
 					hasAbstractVO = true;
 				}
 			}
-			// 判断是否是实体类
+			// 是实体类则开始解析类上的其它注解配置
 			if (isEntity) {
 				entityMeta = new EntityMeta();
 				entityMeta.setEntityClass(realEntityClass);

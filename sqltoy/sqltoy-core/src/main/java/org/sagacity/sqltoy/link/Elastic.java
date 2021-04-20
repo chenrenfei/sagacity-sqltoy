@@ -3,11 +3,6 @@
  */
 package org.sagacity.sqltoy.link;
 
-import java.io.Serializable;
-import java.util.List;
-
-import javax.sql.DataSource;
-
 import org.sagacity.sqltoy.SqlToyContext;
 import org.sagacity.sqltoy.config.model.ElasticEndpoint;
 import org.sagacity.sqltoy.config.model.NoSqlConfigModel;
@@ -18,6 +13,10 @@ import org.sagacity.sqltoy.executor.QueryExecutor;
 import org.sagacity.sqltoy.model.PaginationModel;
 import org.sagacity.sqltoy.plugins.nosql.ElasticSearchPlugin;
 import org.sagacity.sqltoy.plugins.nosql.ElasticSqlPlugin;
+
+import javax.sql.DataSource;
+import java.io.Serializable;
+import java.util.List;
 
 /**
  * @project sagacity-sqltoy4.1
@@ -109,7 +108,7 @@ public class Elastic extends BaseLink {
 	 */
 	public List<?> find() {
 		QueryExecutor queryExecutor = build();
-		SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sql, SqlType.search);
+		SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sql, SqlType.search, "");
 		if (sqlToyConfig.getNoSqlConfigModel() == null) {
 			throw new IllegalArgumentException(ERROR_MESSAGE);
 		}
@@ -131,7 +130,7 @@ public class Elastic extends BaseLink {
 	 */
 	public List<?> findTop(final int topSize) {
 		QueryExecutor queryExecutor = build();
-		SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sql, SqlType.search);
+		SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sql, SqlType.search, "");
 		if (sqlToyConfig.getNoSqlConfigModel() == null) {
 			throw new IllegalArgumentException(ERROR_MESSAGE);
 		}
@@ -153,7 +152,7 @@ public class Elastic extends BaseLink {
 	 */
 	public PaginationModel findPage(PaginationModel pageModel) {
 		QueryExecutor queryExecutor = build();
-		SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sql, SqlType.search);
+		SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sql, SqlType.search, "");
 		NoSqlConfigModel noSqlConfig = sqlToyConfig.getNoSqlConfigModel();
 		if (noSqlConfig == null) {
 			throw new IllegalArgumentException(ERROR_MESSAGE);

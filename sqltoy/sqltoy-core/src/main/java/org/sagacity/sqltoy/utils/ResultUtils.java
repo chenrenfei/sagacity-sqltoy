@@ -3,52 +3,27 @@
  */
 package org.sagacity.sqltoy.utils;
 
-import java.lang.reflect.Array;
-import java.lang.reflect.Type;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-
 import org.sagacity.sqltoy.SqlToyConstants;
 import org.sagacity.sqltoy.SqlToyContext;
 import org.sagacity.sqltoy.callback.RowCallbackHandler;
 import org.sagacity.sqltoy.callback.UpdateRowHandler;
 import org.sagacity.sqltoy.config.SqlConfigParseUtils;
-import org.sagacity.sqltoy.config.model.ColsChainRelativeModel;
-import org.sagacity.sqltoy.config.model.FormatModel;
-import org.sagacity.sqltoy.config.model.LinkModel;
-import org.sagacity.sqltoy.config.model.PivotModel;
-import org.sagacity.sqltoy.config.model.ReverseModel;
-import org.sagacity.sqltoy.config.model.RowsChainRelativeModel;
-import org.sagacity.sqltoy.config.model.SecureMask;
-import org.sagacity.sqltoy.config.model.SqlToyConfig;
-import org.sagacity.sqltoy.config.model.SqlToyResult;
-import org.sagacity.sqltoy.config.model.SqlType;
-import org.sagacity.sqltoy.config.model.SummaryModel;
-import org.sagacity.sqltoy.config.model.Translate;
-import org.sagacity.sqltoy.config.model.UnpivotModel;
+import org.sagacity.sqltoy.config.model.*;
 import org.sagacity.sqltoy.dialect.utils.DialectUtils;
+import org.sagacity.sqltoy.exception.DataAccessException;
 import org.sagacity.sqltoy.executor.QueryExecutor;
-import org.sagacity.sqltoy.model.DataSetResult;
-import org.sagacity.sqltoy.model.LabelIndexModel;
-import org.sagacity.sqltoy.model.QueryExecutorExtend;
-import org.sagacity.sqltoy.model.QueryResult;
-import org.sagacity.sqltoy.model.TranslateExtend;
-import org.sagacity.sqltoy.plugins.calculator.ColsChainRelative;
-import org.sagacity.sqltoy.plugins.calculator.GroupSummary;
-import org.sagacity.sqltoy.plugins.calculator.ReverseList;
-import org.sagacity.sqltoy.plugins.calculator.RowsChainRelative;
-import org.sagacity.sqltoy.plugins.calculator.UnpivotList;
+import org.sagacity.sqltoy.model.*;
+import org.sagacity.sqltoy.plugins.calculator.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.lang.reflect.Array;
+import java.lang.reflect.Type;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * @project sagacity-sqltoy
@@ -64,6 +39,9 @@ public class ResultUtils {
 	 * 定义日志
 	 */
 	private final static Logger logger = LoggerFactory.getLogger(ResultUtils.class);
+
+	private ResultUtils() {
+	}
 
 	/**
 	 * @todo 处理sql查询时的结果集,当没有反调或voClass反射处理时以数组方式返回resultSet的数据
@@ -144,15 +122,16 @@ public class ResultUtils {
 		Integer index;
 		Object value;
 		SecureMask mask;
+		int columnIndex;
 		while (masks.hasNext()) {
 			mask = masks.next();
 			index = labelIndexMap.get(mask.getColumn());
 			if (index != null) {
-				int column = index.intValue();
+				columnIndex = index.intValue();
 				for (List row : rows) {
-					value = row.get(column);
+					value = row.get(columnIndex);
 					if (value != null) {
-						row.set(column, maskStr(mask, value));
+						row.set(columnIndex, maskStr(mask, value));
 					}
 				}
 			}
@@ -169,21 +148,22 @@ public class ResultUtils {
 		Integer index;
 		Object value;
 		FormatModel fmt;
+		int columnIndex;
 		while (formats.hasNext()) {
 			fmt = formats.next();
 			index = labelIndexMap.get(fmt.getColumn());
 			if (index != null) {
-				int column = index.intValue();
+				columnIndex = index.intValue();
 				for (List row : rows) {
-					value = row.get(column);
+					value = row.get(columnIndex);
 					if (value != null) {
 						// 日期格式
 						if (fmt.getType() == 1) {
-							row.set(column, DateUtil.formatDate(value, fmt.getFormat()));
+							row.set(columnIndex, DateUtil.formatDate(value, fmt.getFormat()));
 						}
 						// 数字格式化
 						else {
-							row.set(column, NumberUtil.format(value, fmt.getFormat()));
+							row.set(columnIndex, NumberUtil.format(value, fmt.getFormat()));
 						}
 					}
 				}
@@ -284,14 +264,19 @@ public class ResultUtils {
 			String[] labelNames, int startColIndex) throws Exception {
 		// 字段连接(多行数据拼接成一个数据,以一行显示)
 		LinkModel linkModel = sqlToyConfig.getLinkModel();
+		// update 2020-09-13 存在多列link(独立出去编写,避免对单列产生影响)
+		if (linkModel != null && linkModel.getColumns().length > 1) {
+			return getMoreLinkResultSet(sqlToyConfig, sqlToyContext, conn, rs, rowCnt, labelIndexMap, labelNames,
+					startColIndex);
+		}
+
 		List<List> items = new ArrayList();
-		boolean isDebug = logger.isDebugEnabled();
 		// 判断是否有缓存翻译器定义
 		Boolean hasTranslate = (sqlToyConfig.getTranslateMap().isEmpty()) ? false : true;
 		HashMap<String, Translate> translateMap = sqlToyConfig.getTranslateMap();
 		HashMap<String, HashMap<String, Object[]>> translateCache = null;
 		if (hasTranslate) {
-			translateCache = sqlToyContext.getTranslateManager().getTranslates(sqlToyContext, conn, translateMap);
+			translateCache = sqlToyContext.getTranslateManager().getTranslates(conn, translateMap);
 			if (translateCache == null || translateCache.isEmpty()) {
 				hasTranslate = false;
 				logger.debug("通过缓存配置未获取到缓存数据,请正确配置TranslateManager!");
@@ -317,7 +302,11 @@ public class ResultUtils {
 		List rowTemp;
 		if (linkModel != null) {
 			Object identity = null;
-			int linkIndex = labelIndexMap.get(linkModel.getColumn().toLowerCase());
+			String linkColumn = linkModel.getColumns()[0];
+			if (!labelIndexMap.containsKey(linkColumn.toLowerCase())) {
+				throw new DataAccessException("做link操作时,查询结果字段中没有字段:" + linkColumn + ",请检查sql或link 配置的正确性!");
+			}
+			int linkIndex = labelIndexMap.get(linkColumn.toLowerCase());
 			StringBuilder linkBuffer = new StringBuilder();
 			boolean hasDecorate = (linkModel.getDecorateAppendChar() == null) ? false : true;
 			boolean isLeft = true;
@@ -326,15 +315,13 @@ public class ResultUtils {
 			}
 			Object preIdentity = null;
 			Object linkValue;
-			Object linkStr;
-			boolean translateLink = hasTranslate ? translateMap.containsKey(linkModel.getColumn().toLowerCase())
-					: false;
+			String linkStr;
+			boolean translateLink = hasTranslate ? translateMap.containsKey(linkColumn.toLowerCase()) : false;
 			HashMap<String, Object[]> linkTranslateMap = null;
 			int linkTranslateIndex = 1;
-			// Translate translateModel = null;
 			TranslateExtend extend = null;
 			if (translateLink) {
-				extend = translateMap.get(linkModel.getColumn().toLowerCase()).getExtend();
+				extend = translateMap.get(linkColumn.toLowerCase()).getExtend();
 				linkTranslateIndex = extend.index;
 				linkTranslateMap = translateCache.get(extend.column);
 			}
@@ -343,20 +330,19 @@ public class ResultUtils {
 			boolean isLastProcess = false;
 			while (rs.next()) {
 				isLastProcess = false;
-				linkValue = rs.getObject(linkModel.getColumn());
+				linkValue = rs.getObject(linkColumn);
 				if (linkValue == null) {
 					linkStr = "";
 				} else {
 					if (translateLink) {
 						cacheValues = linkTranslateMap.get(linkValue.toString());
 						if (cacheValues == null) {
-							linkStr = "";
-							if (isDebug) {
-								logger.debug("translate cache:{},dictType:{}, 对应的key:{} 没有设置相应的value!", extend.cache,
-										extend.cacheType, linkValue);
-							}
+							linkStr = "[" + linkValue + "]未匹配";
+							logger.debug("translate cache:{},cacheType:{}, 对应的key:{} 没有设置相应的value!", extend.cache,
+									extend.cacheType, linkValue);
 						} else {
-							linkStr = cacheValues[linkTranslateIndex];
+							linkStr = (cacheValues[linkTranslateIndex] == null) ? ""
+									: cacheValues[linkTranslateIndex].toString();
 						}
 					} else {
 						linkStr = linkValue.toString();
@@ -381,12 +367,15 @@ public class ResultUtils {
 					}
 					preIdentity = identity;
 				} else {
+					isLastProcess = true;
 					if (linkBuffer.length() > 0) {
 						linkBuffer.append(linkModel.getSign());
 					}
-					linkBuffer.append(hasDecorate ? StringUtil.appendStr(linkStr.toString(),
-							linkModel.getDecorateAppendChar(), linkModel.getDecorateSize(), isLeft) : linkStr);
-					isLastProcess = true;
+					linkBuffer
+							.append(hasDecorate
+									? StringUtil.appendStr(linkStr, linkModel.getDecorateAppendChar(),
+											linkModel.getDecorateSize(), isLeft)
+									: linkStr);
 				}
 				index++;
 				// 存在超出25000条数据的查询
@@ -399,6 +388,7 @@ public class ResultUtils {
 					break;
 				}
 			}
+			// 对最后一条写入循环值
 			if (isLastProcess) {
 				items.get(items.size() - 1).set(linkIndex, linkBuffer.toString());
 			}
@@ -454,6 +444,184 @@ public class ResultUtils {
 						break;
 					}
 				}
+			}
+		}
+		// 超出警告阀值
+		if (warnLimit) {
+			warnLog(sqlToyConfig, index);
+		}
+		// 超过最大提取数据阀值
+		if (maxLimit) {
+			logger.error("MaxLargeResult:执行sql提取数据超出最大阀值限制{},sqlId={},具体语句={}", index, sqlToyConfig.getId(),
+					sqlToyConfig.getSql(null));
+		}
+		return items;
+	}
+
+	/**
+	 * 目前还未实现，只支持单列link
+	 * 
+	 * @param sqlToyConfig
+	 * @param sqlToyContext
+	 * @param conn
+	 * @param rs
+	 * @param rowCnt
+	 * @param labelIndexMap
+	 * @param labelNames
+	 * @param startColIndex
+	 * @return
+	 * @throws Exception
+	 */
+	private static List getMoreLinkResultSet(SqlToyConfig sqlToyConfig, SqlToyContext sqlToyContext, Connection conn,
+			ResultSet rs, int rowCnt, HashMap<String, Integer> labelIndexMap, String[] labelNames, int startColIndex)
+			throws Exception {
+		// 字段连接(多行数据拼接成一个数据,以一行显示)
+		LinkModel linkModel = sqlToyConfig.getLinkModel();
+		List<List> items = new ArrayList();
+		// 判断是否有缓存翻译器定义
+		Boolean hasTranslate = (sqlToyConfig.getTranslateMap().isEmpty()) ? false : true;
+		HashMap<String, Translate> translateMap = sqlToyConfig.getTranslateMap();
+		HashMap<String, HashMap<String, Object[]>> translateCache = null;
+		if (hasTranslate) {
+			translateCache = sqlToyContext.getTranslateManager().getTranslates(conn, translateMap);
+			if (translateCache == null || translateCache.isEmpty()) {
+				hasTranslate = false;
+				logger.debug("通过缓存配置未获取到缓存数据,请正确配置TranslateManager!");
+			}
+		}
+
+		// link 目前只支持单个字段运算
+		int columnSize = labelNames.length;
+		int index = 0;
+
+		// 警告阀值
+		int warnThresholds = SqlToyConstants.getWarnThresholds();
+		boolean warnLimit = false;
+		// 最大阀值
+		long maxThresholds = SqlToyConstants.getMaxThresholds();
+		boolean maxLimit = false;
+		// 是否判断全部为null的行记录
+		boolean ignoreAllEmpty = sqlToyConfig.isIgnoreEmpty();
+		// 最大值要大于等于警告阀值
+		if (maxThresholds > 1 && maxThresholds <= warnThresholds) {
+			maxThresholds = warnThresholds;
+		}
+
+		int linkCols = linkModel.getColumns().length;
+		String[] linkColumns = linkModel.getColumns();
+		int[] linkIndexs = new int[linkCols];
+		StringBuilder[] linkBuffers = new StringBuilder[linkCols];
+		boolean[] translateLinks = new boolean[linkCols];
+		TranslateExtend[] transExtends = new TranslateExtend[linkCols];
+		String linkColumn;
+		for (int i = 0; i < linkCols; i++) {
+			linkBuffers[i] = new StringBuilder();
+			linkColumn = linkColumns[i];
+			if (!labelIndexMap.containsKey(linkColumn.toLowerCase())) {
+				throw new DataAccessException("做link操作时,查询结果字段中没有字段:" + linkColumn + ",请检查sql或link 配置的正确性!");
+			}
+			linkIndexs[i] = labelIndexMap.get(linkColumn.toLowerCase());
+			if (hasTranslate) {
+				translateLinks[i] = translateMap.containsKey(linkColumn.toLowerCase());
+				if (translateLinks[i]) {
+					transExtends[i] = translateMap.get(linkColumn.toLowerCase()).getExtend();
+				}
+			}
+		}
+		// link是否有修饰器
+		boolean hasDecorate = (linkModel.getDecorateAppendChar() == null) ? false : true;
+		boolean isLeft = true;
+		if (hasDecorate) {
+			isLeft = linkModel.getDecorateAlign().equals("left") ? true : false;
+		}
+		Object preIdentity = null;
+		Object[] linkValues = new Object[linkCols];
+		String[] linkStrs = new String[linkCols];
+
+		TranslateExtend extend = null;
+		Object[] cacheValues;
+		List rowTemp;
+		Object identity = null;
+		// 判断link拼接是否重新开始
+		boolean isLastProcess = false;
+		while (rs.next()) {
+			isLastProcess = false;
+			// 对多个link字段取值并进行翻译转义
+			for (int i = 0; i < linkCols; i++) {
+				linkValues[i] = rs.getObject(linkColumns[i]);
+				if (linkValues[i] == null) {
+					linkStrs[i] = "";
+				} else {
+					if (translateLinks[i]) {
+						extend = transExtends[i];
+						cacheValues = translateCache.get(extend.column).get(linkValues[i].toString());
+						if (cacheValues == null) {
+							linkStrs[i] = "[" + linkValues[i] + "]未匹配";
+							logger.debug("translate cache:{},cacheType:{}, 对应的key:{} 没有设置相应的value!", extend.cache,
+									extend.cacheType, linkValues[i]);
+						} else {
+							linkStrs[i] = (cacheValues[extend.index] == null) ? ""
+									: cacheValues[extend.index].toString();
+						}
+					} else {
+						linkStrs[i] = linkValues[i].toString();
+					}
+				}
+			}
+			// 取分组列的值
+			identity = (linkModel.getIdColumn() == null) ? "default" : rs.getObject(linkModel.getIdColumn());
+			// 不相等
+			if (!identity.equals(preIdentity)) {
+				// 不相等时先对最后一条记录修改，写入拼接后的字符串
+				if (index != 0) {
+					rowTemp = items.get(items.size() - 1);
+					for (int i = 0; i < linkCols; i++) {
+						rowTemp.set(linkIndexs[i], linkBuffers[i].toString());
+						linkBuffers[i].delete(0, linkBuffers[i].length());
+					}
+				}
+				// 再写入新的拼接串
+				for (int i = 0; i < linkCols; i++) {
+					linkBuffers[i].append(linkStrs[i]);
+				}
+				// 提取result中的数据(identity相等时不需要提取)
+				if (hasTranslate) {
+					rowTemp = processResultRowWithTranslate(translateMap, translateCache, labelNames, rs, columnSize,
+							ignoreAllEmpty);
+				} else {
+					rowTemp = processResultRow(rs, startColIndex, rowCnt, ignoreAllEmpty);
+				}
+				if (rowTemp != null) {
+					items.add(rowTemp);
+				}
+				preIdentity = identity;
+			} else {
+				isLastProcess = true;
+				// identity相同，表示还在同一组内，直接拼接link字符
+				for (int i = 0; i < linkCols; i++) {
+					if (linkBuffers[i].length() > 0) {
+						linkBuffers[i].append(linkModel.getSign());
+					}
+					linkBuffers[i].append(hasDecorate ? StringUtil.appendStr(linkStrs[i],
+							linkModel.getDecorateAppendChar(), linkModel.getDecorateSize(), isLeft) : linkStrs[i]);
+				}
+			}
+			index++;
+			// 存在超出25000条数据的查询
+			if (index == warnThresholds) {
+				warnLimit = true;
+			}
+			// 提取数据超过上限(-1表示不限制)
+			if (index == maxThresholds) {
+				maxLimit = true;
+				break;
+			}
+		}
+		// 数据集合不为空,对最后一条记录写入循环值
+		if (isLastProcess) {
+			rowTemp = items.get(items.size() - 1);
+			for (int i = 0; i < linkCols; i++) {
+				rowTemp.set(linkIndexs[i], linkBuffers[i].toString());
 			}
 		}
 		// 超出警告阀值
@@ -673,7 +841,6 @@ public class ResultUtils {
 			boolean ignoreAllEmptySet) throws Exception {
 		List rowData = new ArrayList();
 		Object fieldValue;
-		// Translate translate;
 		TranslateExtend extend;
 		String label;
 		String keyIndex;
@@ -740,11 +907,12 @@ public class ResultUtils {
 		String linkSign = extend.linkSign;
 		StringBuilder result = new StringBuilder();
 		int index = 0;
+		Object[] cacheValues;
 		for (String key : keys) {
 			if (index > 0) {
 				result.append(linkSign);
 			}
-			Object[] cacheValues = translateKeyMap.get(key.trim());
+			cacheValues = translateKeyMap.get(key.trim());
 			if (cacheValues == null || cacheValues.length == 0) {
 				if (extend.uncached != null) {
 					result.append(extend.uncached.replace("${value}", key));
@@ -785,7 +953,7 @@ public class ResultUtils {
 					PivotModel pivotModel = (PivotModel) processor;
 					if (pivotModel.getCategorySql() != null) {
 						SqlToyConfig pivotSqlConfig = DialectUtils.getUnifyParamsNamedConfig(sqlToyContext,
-								sqlToyContext.getSqlToyConfig(pivotModel.getCategorySql(), SqlType.search),
+								sqlToyContext.getSqlToyConfig(pivotModel.getCategorySql(), SqlType.search, ""),
 								queryExecutor, dialect, false);
 						SqlToyResult pivotSqlToyResult = SqlConfigParseUtils.processSql(pivotSqlConfig.getSql(dialect),
 								extend.getParamsName(pivotSqlConfig),

@@ -6,6 +6,8 @@ package vo;
 import org.sagacity.sqltoy.config.annotation.SqlToyEntity;
 import vo.base.AbstractSysLocationVO;
 
+import java.math.BigDecimal;
+
 /**
  * @project chome
  * @author jobell
@@ -24,20 +26,28 @@ public class SysLocationVO extends AbstractSysLocationVO {
 		super();
 	}
 	/*---begin-constructor-area---don't-update-this-area--*/
-
-	/** minimal constructor */
+	/** pk constructor */
 	public SysLocationVO(Long locationId)
 	{
 		this.locationId=locationId;
 	}
 
+
 	/** full constructor */
-	public SysLocationVO(Long locationId,String locationName,Long onlinePersion,Long totalPersion)
+	public SysLocationVO(Long locationId, String locationName, String locationInfo, BigDecimal longitude, BigDecimal latitude, Integer status, Long areaCode, Integer publicFlag, Integer virtualFlag, String groupChatId, Long locationType, String locationBackimg)
 	{
 		this.locationId=locationId;
 		this.locationName=locationName;
-		this.onlinePersion=onlinePersion;
-		this.totalPersion=totalPersion;
+		this.locationInfo=locationInfo;
+		this.longitude=longitude;
+		this.latitude=latitude;
+		this.status=status;
+		this.areaCode=areaCode;
+		this.publicFlag=publicFlag;
+		this.virtualFlag=virtualFlag;
+		this.groupChatId=groupChatId;
+		this.locationType=locationType;
+		this.locationBackimg=locationBackimg;
 	}
 
 	/*---end-constructor-area---don't-update-this-area--*/

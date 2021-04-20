@@ -3,9 +3,9 @@
  */
 package org.sagacity.sqltoy.dialect.model;
 
-import java.io.Serializable;
-
 import org.sagacity.sqltoy.config.model.PKStrategy;
+
+import java.io.Serializable;
 
 /**
  * @project sqltoy-orm

@@ -3,36 +3,6 @@
  */
 package org.sagacity.sqltoy.utils;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.Reader;
-import java.lang.reflect.Method;
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.sql.Blob;
-import java.sql.CallableStatement;
-import java.sql.Clob;
-import java.sql.Connection;
-import java.sql.NClob;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Timestamp;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
-
 import org.sagacity.sqltoy.SqlExecuteStat;
 import org.sagacity.sqltoy.SqlToyConstants;
 import org.sagacity.sqltoy.SqlToyContext;
@@ -46,6 +16,21 @@ import org.sagacity.sqltoy.model.TreeTableModel;
 import org.sagacity.sqltoy.utils.DataSourceUtils.DBType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.Reader;
+import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.sql.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 /**
  * @project sagacity-sqltoy
@@ -105,6 +90,9 @@ public class SqlUtil {
 		sqlCommentfilters.put("'", "'");
 		sqlCommentfilters.put("(", ")");
 		sqlCommentfilters.put("{", "}");
+	}
+
+	private SqlUtil() {
 	}
 
 	/**
@@ -279,7 +267,7 @@ public class SqlUtil {
 				pst.setNull(paramIndex, java.sql.Types.NULL);
 			}
 		} else {
-			if (paramValue instanceof java.lang.String) {
+			if (paramValue instanceof String) {
 				tmpStr = (String) paramValue;
 				if (jdbcType == java.sql.Types.CLOB) {
 					Clob clob = conn.createClob();
@@ -292,13 +280,13 @@ public class SqlUtil {
 				} else {
 					pst.setString(paramIndex, tmpStr);
 				}
-			} else if (paramValue instanceof java.lang.Integer) {
+			} else if (paramValue instanceof Integer) {
 				pst.setInt(paramIndex, ((Integer) paramValue));
-			} else if (paramValue instanceof java.time.LocalDateTime) {
+			} else if (paramValue instanceof LocalDateTime) {
 				pst.setTimestamp(paramIndex, Timestamp.valueOf((LocalDateTime) paramValue));
 			} else if (paramValue instanceof BigDecimal) {
 				pst.setBigDecimal(paramIndex, (BigDecimal) paramValue);
-			} else if (paramValue instanceof java.time.LocalDate) {
+			} else if (paramValue instanceof LocalDate) {
 				pst.setDate(paramIndex, java.sql.Date.valueOf((LocalDate) paramValue));
 			} else if (paramValue instanceof java.util.Date) {
 				if (dbType == DBType.CLICKHOUSE) {
@@ -306,16 +294,16 @@ public class SqlUtil {
 				} else {
 					pst.setTimestamp(paramIndex, new Timestamp(((java.util.Date) paramValue).getTime()));
 				}
-			} else if (paramValue instanceof java.math.BigInteger) {
+			} else if (paramValue instanceof BigInteger) {
 				pst.setBigDecimal(paramIndex, new BigDecimal(((BigInteger) paramValue)));
-			} else if (paramValue instanceof java.sql.Timestamp) {
-				pst.setTimestamp(paramIndex, (java.sql.Timestamp) paramValue);
-			} else if (paramValue instanceof java.lang.Double) {
+			} else if (paramValue instanceof Timestamp) {
+				pst.setTimestamp(paramIndex, (Timestamp) paramValue);
+			} else if (paramValue instanceof Double) {
 				pst.setDouble(paramIndex, ((Double) paramValue));
-			} else if (paramValue instanceof java.lang.Long) {
+			} else if (paramValue instanceof Long) {
 				pst.setLong(paramIndex, ((Long) paramValue));
-			} else if (paramValue instanceof java.sql.Clob) {
-				tmpStr = clobToString((java.sql.Clob) paramValue);
+			} else if (paramValue instanceof Clob) {
+				tmpStr = clobToString((Clob) paramValue);
 				pst.setString(paramIndex, tmpStr);
 			} else if (paramValue instanceof byte[]) {
 				if (jdbcType == java.sql.Types.BLOB) {
@@ -333,25 +321,25 @@ public class SqlUtil {
 				} else {
 					pst.setBytes(paramIndex, (byte[]) paramValue);
 				}
-			} else if (paramValue instanceof java.lang.Float) {
+			} else if (paramValue instanceof Float) {
 				pst.setFloat(paramIndex, ((Float) paramValue));
-			} else if (paramValue instanceof java.sql.Blob) {
-				Blob tmp = (java.sql.Blob) paramValue;
+			} else if (paramValue instanceof Blob) {
+				Blob tmp = (Blob) paramValue;
 				pst.setBytes(paramIndex, tmp.getBytes(0, Long.valueOf(tmp.length()).intValue()));
 			} else if (paramValue instanceof java.sql.Date) {
 				pst.setDate(paramIndex, (java.sql.Date) paramValue);
-			} else if (paramValue instanceof java.lang.Boolean) {
+			} else if (paramValue instanceof Boolean) {
 				pst.setBoolean(paramIndex, (Boolean) paramValue);
-			} else if (paramValue instanceof java.time.LocalTime) {
+			} else if (paramValue instanceof LocalTime) {
 				pst.setTime(paramIndex, java.sql.Time.valueOf((LocalTime) paramValue));
 			} else if (paramValue instanceof java.sql.Time) {
 				pst.setTime(paramIndex, (java.sql.Time) paramValue);
-			} else if (paramValue instanceof java.lang.Character) {
+			} else if (paramValue instanceof Character) {
 				tmpStr = ((Character) paramValue).toString();
 				pst.setString(paramIndex, tmpStr);
-			} else if (paramValue instanceof java.lang.Short) {
-				pst.setShort(paramIndex, (java.lang.Short) paramValue);
-			} else if (paramValue instanceof java.lang.Byte) {
+			} else if (paramValue instanceof Short) {
+				pst.setShort(paramIndex, (Short) paramValue);
+			} else if (paramValue instanceof Byte) {
 				pst.setByte(paramIndex, (Byte) paramValue);
 			} else {
 				if (jdbcType != -1) {
@@ -720,8 +708,8 @@ public class SqlUtil {
 					fieldValue = rs.getObject(i + 1);
 					if (fieldValue != null) {
 						allNull = false;
-						if (fieldValue instanceof java.sql.Clob) {
-							fieldValue = clobToString((java.sql.Clob) fieldValue);
+						if (fieldValue instanceof Clob) {
+							fieldValue = clobToString((Clob) fieldValue);
 						}
 					}
 					rowData.add(fieldValue);
@@ -885,6 +873,7 @@ public class SqlUtil {
 					.concat(treeTableModel.getNodeRouteField()).concat(" from ").concat(treeTableModel.getTableName())
 					.concat(" where ").concat(treeTableModel.getIdField()).concat("=").concat(flag)
 					.concat(treeTableModel.getRootId().toString()).concat(flag);
+			//附加条件(如一张表里面分账套,将多家企业的部门信息放于一张表中,附加条件就可以是账套)
 			if (StringUtil.isNotBlank(treeTableModel.getConditions())) {
 				idInfoSql = idInfoSql.concat(" and ").concat(treeTableModel.getConditions());
 			}
@@ -901,6 +890,7 @@ public class SqlUtil {
 					.append(" set ").append(treeTableModel.getNodeLevelField()).append("=?,")
 					.append(treeTableModel.getNodeRouteField()).append("=? ").append(" where ")
 					.append(treeTableModel.getIdField()).append("=?");
+			//附加条件
 			if (StringUtil.isNotBlank(treeTableModel.getConditions())) {
 				nextNodeQueryStr.append(" and ").append(treeTableModel.getConditions());
 				updateLevelAndRoute.append(" and ").append(treeTableModel.getConditions());
@@ -940,14 +930,15 @@ public class SqlUtil {
 			if (StringUtil.isNotBlank(treeTableModel.getConditions())) {
 				updateLeafSql.append(" where ").append(treeTableModel.getConditions());
 			}
+			// 先将所有节点设置为叶子
 			executeSql(updateLeafSql.toString(), null, null, conn, dbType, true);
 
-			// 设置被设置为父节点的记录为非叶子节点(isLeaf=0)
+			// 再设置父节点的记录为非叶子节点(isLeaf=0)
 			StringBuilder updateTrunkLeafSql = new StringBuilder();
 			updateTrunkLeafSql.append("update ").append(treeTableModel.getTableName());
 			// int dbType = DataSourceUtils.getDbType(conn);
 			// 支持mysql8 update 2018-5-11
-			if (dbType == DataSourceUtils.DBType.MYSQL || dbType == DataSourceUtils.DBType.MYSQL57) {
+			if (dbType == DBType.MYSQL || dbType == DBType.MYSQL57) {
 				// update sys_organ_info a inner join (select t.organ_pid from
 				// sys_organ_info t) b
 				// on a.organ_id=b.organ_pid set IS_LEAF=0
@@ -1107,7 +1098,7 @@ public class SqlUtil {
 		if (splitSign.indexOf("go") != -1) {
 			sqlContent = StringUtil.clearMistyChars(sqlContent, " ");
 		}
-		// sqlserver sybase 数据库以go 分割,则整个sql文件作为一个语句执行
+		// 分割成多个子语句
 		String[] statments = StringUtil.splitExcludeSymMark(sqlContent, splitSign, sqlCommentfilters);
 		boolean hasSetAutoCommit = false;
 		// 是否自动提交
@@ -1216,7 +1207,7 @@ public class SqlUtil {
 	 */
 	public static Long executeSql(final String executeSql, final Object[] params, final Integer[] paramsType,
 			final Connection conn, final Integer dbType, final Boolean autoCommit) throws Exception {
-		SqlExecuteStat.showSql("execute sql=" + executeSql, params);
+		SqlExecuteStat.showSql("execute sql=", executeSql, params);
 		boolean hasSetAutoCommit = false;
 		Long updateCounts = null;
 		if (autoCommit != null) {
@@ -1390,7 +1381,11 @@ public class SqlUtil {
 					}
 					varSql = preSql.trim();
 					// 首位字符不是数字(48~57)、(A-Z|a-z)字母(65~90,97~122)、下划线(95)、冒号(58)
-					preChar = varSql.charAt(varSql.length() - 1);
+					if (!varSql.equals("")) {
+						preChar = varSql.charAt(varSql.length() - 1);
+					} else {
+						preChar = ' ';
+					}
 					tailChar = realSql.charAt(index + field.length());
 					// 非条件参数(58为冒号)
 					if (((isBlank && preChar != 58) || (preChar > 58 && preChar < 65)
@@ -1446,6 +1441,16 @@ public class SqlUtil {
 		if (sqlLow.startsWith("select") || sqlLow.startsWith("with")) {
 			return sql;
 		}
+		// 存储过程模式直接返回
+		if (StringUtil.matches(sqlLow, "^\\s*\\{?\\W*call\\W+")) {
+			return sql;
+		}
+
+		// show 命令
+		if (StringUtil.matches(" ".concat(sqlLow), "^\\Wshow\\W")) {
+			return sql;
+		}
+
 		if (!sqlToyContext.isEntity(entityClass)) {
 			return sql;
 		}

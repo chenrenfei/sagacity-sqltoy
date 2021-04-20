@@ -3,9 +3,8 @@
  */
 package org.sagacity.sqltoy.model;
 
-import java.io.Serializable;
-
 import javax.sql.DataSource;
+import java.io.Serializable;
 
 /**
  * @description 提供给代码中组织sql进行数据库update操作
@@ -33,6 +32,11 @@ public class EntityUpdate implements Serializable {
 		return this;
 	}
 
+	/**
+	 * @TODO 设置条件
+	 * @param where
+	 * @return
+	 */
 	public EntityUpdate where(String where) {
 		innerModel.where = where;
 		return this;

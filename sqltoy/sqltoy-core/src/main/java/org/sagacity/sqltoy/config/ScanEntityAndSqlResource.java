@@ -3,25 +3,20 @@
  */
 package org.sagacity.sqltoy.config;
 
+import org.sagacity.sqltoy.config.annotation.SqlToyEntity;
+import org.sagacity.sqltoy.utils.StringUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.net.JarURLConnection;
 import java.net.URL;
 import java.net.URLDecoder;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.Vector;
+import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-
-import org.sagacity.sqltoy.config.annotation.SqlToyEntity;
-import org.sagacity.sqltoy.utils.StringUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @project sagacity-sqltoy
@@ -47,12 +42,13 @@ public class ScanEntityAndSqlResource {
 	private static final String CLASSPATH = "classpath:";
 
 	/**
-	 * @todo 从指定包package中获取所有的sqltoy实体对象
+	 * @todo 从指定包package中获取所有的sqltoy实体对象(意义已经不大,entity类目前已经改为使用时加载解析模式)
 	 * @param pack
 	 * @param recursive
 	 * @param charset
 	 * @return
 	 */
+	@Deprecated
 	public static Set<Class<?>> getPackageEntities(String pack, boolean recursive, String charset) {
 		// class类的集合
 		Set<Class<?>> entities = new LinkedHashSet<Class<?>>();
@@ -63,7 +59,7 @@ public class ScanEntityAndSqlResource {
 			packageName = packageName.substring(1);
 		}
 		String packageDirName = packageName.replace('.', '/');
-		// 定义一个枚举的集合 并进行循环来处理这个目录下的things
+		// 定义一个枚举的集合,循环向下级目录检索entity类
 		Enumeration<URL> dirs;
 		try {
 			dirs = Thread.currentThread().getContextClassLoader().getResources(packageDirName);
@@ -128,12 +124,13 @@ public class ScanEntityAndSqlResource {
 	}
 
 	/**
-	 * @todo 以文件的形式来获取包下的所有Class
+	 * @todo 以文件的形式来获取包下的所有Class(意义已经不大,entity类目前已经改为使用时加载解析模式)
 	 * @param packageName
 	 * @param packagePath
 	 * @param recursive
 	 * @param entities
 	 */
+	@Deprecated
 	public static void addEntitiesInPackage(String packageName, String packagePath, final boolean recursive,
 			Set<Class<?>> entities) {
 		// 获取此包的目录 建立一个File
@@ -152,7 +149,7 @@ public class ScanEntityAndSqlResource {
 		// 循环所有文件
 		String className;
 		for (File file : dirfiles) {
-			// 如果是目录 则继续扫描
+			// 如果是目录 则继续递归扫描
 			if (file.isDirectory()) {
 				addEntitiesInPackage(packageName.concat(".").concat(file.getName()), file.getAbsolutePath(), recursive,
 						entities);
@@ -190,7 +187,7 @@ public class ScanEntityAndSqlResource {
 	 * @todo 获取sqltoy配置的sql文件
 	 * @param resourceDir
 	 * @param mappingResources
-	 * @param dialect
+	 * @param dialect 方言过滤(目前已经废弃)
 	 * @return
 	 * @throws Exception
 	 */
@@ -233,7 +230,7 @@ public class ScanEntityAndSqlResource {
 								if (sqlFile.startsWith(realRes)
 										&& sqlFile.toLowerCase().endsWith(SQLTOY_SQL_FILE_SUFFIX)
 										&& !entry.isDirectory()) {
-									//update 2020-03-13 调整sql加载策略
+									// update 2020-03-13 调整sql加载策略
 									// jar中的sql顺序放在前面,从而便于classes里面的sql可以在后面加载可以覆盖前面的，便于项目做增量更新
 									result.add(0, sqlFile);
 								}
@@ -288,7 +285,7 @@ public class ScanEntityAndSqlResource {
 	 * @param startClasspath
 	 * @return
 	 * @throws Exception
-	 * @Modify update 2017-10-28 从单URL变成URL枚举数组
+	 * @modify update 2017-10-28 从单URL变成URL枚举数组
 	 */
 	private static Enumeration<URL> getResourceUrls(String resource, boolean startClasspath) throws Exception {
 		Enumeration<URL> urls = null;
@@ -317,7 +314,7 @@ public class ScanEntityAndSqlResource {
 	}
 
 	/**
-	 * @todo 递归获取文件夹下面的sqltoy sql.xml文件
+	 * @todo 递归获取文件夹下面的以sql.xml结尾的sql文件
 	 * @param parentFile
 	 * @param fileList
 	 */

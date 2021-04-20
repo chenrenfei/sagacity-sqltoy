@@ -3,13 +3,6 @@
  */
 package org.sagacity.sqltoy.config.model;
 
-import java.io.Serializable;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
@@ -21,6 +14,13 @@ import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
 import org.sagacity.sqltoy.utils.StringUtil;
+
+import java.io.Serializable;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @project sagacity-sqltoy4.0
@@ -293,7 +293,7 @@ public class ElasticEndpoint implements Serializable {
 			for (String urlStr : urls) {
 				try {
 					if (StringUtil.isNotBlank(urlStr)) {
-						URL url = new java.net.URL(urlStr.trim());
+						URL url = new URL(urlStr.trim());
 						hosts.add(new HttpHost(url.getHost(), url.getPort(), url.getProtocol()));
 					}
 				} catch (MalformedURLException e) {
@@ -371,7 +371,7 @@ public class ElasticEndpoint implements Serializable {
 	public static void main(String args[]) {
 		String urlStr = "http://192.168.56.1:9200";
 		try {
-			URL url = new java.net.URL(urlStr);
+			URL url = new URL(urlStr);
 			System.err.println("protocol=" + url.getProtocol());
 			System.err.println("host=" + url.getHost());
 			System.err.println("port=" + url.getPort());

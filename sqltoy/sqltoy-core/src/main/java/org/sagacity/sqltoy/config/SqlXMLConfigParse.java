@@ -3,8 +3,20 @@
  */
 package org.sagacity.sqltoy.config;
 
-import static java.lang.System.out;
+import org.sagacity.sqltoy.SqlToyConstants;
+import org.sagacity.sqltoy.config.model.*;
+import org.sagacity.sqltoy.dialect.utils.PageOptimizeUtils;
+import org.sagacity.sqltoy.plugins.function.FunctionUtils;
+import org.sagacity.sqltoy.utils.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -16,42 +28,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-
-import org.sagacity.sqltoy.SqlToyConstants;
-import org.sagacity.sqltoy.config.model.CacheFilterModel;
-import org.sagacity.sqltoy.config.model.ColsChainRelativeModel;
-import org.sagacity.sqltoy.config.model.FormatModel;
-import org.sagacity.sqltoy.config.model.GroupMeta;
-import org.sagacity.sqltoy.config.model.LinkModel;
-import org.sagacity.sqltoy.config.model.NoSqlConfigModel;
-import org.sagacity.sqltoy.config.model.PageOptimize;
-import org.sagacity.sqltoy.config.model.ParamFilterModel;
-import org.sagacity.sqltoy.config.model.PivotModel;
-import org.sagacity.sqltoy.config.model.QueryShardingModel;
-import org.sagacity.sqltoy.config.model.ReverseModel;
-import org.sagacity.sqltoy.config.model.RowsChainRelativeModel;
-import org.sagacity.sqltoy.config.model.SecureMask;
-import org.sagacity.sqltoy.config.model.SqlToyConfig;
-import org.sagacity.sqltoy.config.model.SqlType;
-import org.sagacity.sqltoy.config.model.SummaryModel;
-import org.sagacity.sqltoy.config.model.Translate;
-import org.sagacity.sqltoy.config.model.UnpivotModel;
-import org.sagacity.sqltoy.dialect.utils.PageOptimizeUtils;
-import org.sagacity.sqltoy.plugins.function.FunctionUtils;
-import org.sagacity.sqltoy.utils.BeanUtil;
-import org.sagacity.sqltoy.utils.DataSourceUtils;
-import org.sagacity.sqltoy.utils.ReservedWordsUtil;
-import org.sagacity.sqltoy.utils.SqlUtil;
-import org.sagacity.sqltoy.utils.StringUtil;
-import org.sagacity.sqltoy.utils.XMLUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
+import static java.lang.System.out;
 
 /**
  * @project sagacity-sqltoy
@@ -405,7 +382,7 @@ public class SqlXMLConfigParse {
 	private static void parseNoSql(SqlToyConfig sqlToyConfig, Element sqlElt, String local) {
 		NoSqlConfigModel noSqlConfig = new NoSqlConfigModel();
 		NodeList nodeList;
-
+		// mongo 的collection
 		if (sqlElt.hasAttribute("collection")) {
 			noSqlConfig.setCollection(sqlElt.getAttribute("collection"));
 		}
@@ -422,7 +399,7 @@ public class SqlXMLConfigParse {
 		if (sqlElt.hasAttribute("index")) {
 			noSqlConfig.setIndex(sqlElt.getAttribute("index"));
 		}
-
+		// es 索引类型
 		if (sqlElt.hasAttribute("type")) {
 			noSqlConfig.setType(sqlElt.getAttribute("type"));
 		}
@@ -568,6 +545,12 @@ public class SqlXMLConfigParse {
 		sqlToyConfig.setSecureMasks(secureMasks);
 	}
 
+	/**
+	 * @TODO 获取xml元素的属性值
+	 * @param elt
+	 * @param attrName
+	 * @return
+	 */
 	private static String getAttrValue(Element elt, String attrName) {
 		if (elt.hasAttribute(attrName)) {
 			return elt.getAttribute(attrName);
@@ -624,7 +607,7 @@ public class SqlXMLConfigParse {
 			elt = (Element) shardingTables.item(i);
 			if (elt.hasAttribute("tables") && elt.hasAttribute("strategy")) {
 				QueryShardingModel shardingModel = new QueryShardingModel();
-				shardingModel.setTables(elt.getAttribute("tables").split(","));
+				shardingModel.setTables(elt.getAttribute("tables").split("\\,"));
 				if (elt.hasAttribute("params")) {
 					// params="a:a1,b:b1";params为{a:a1, b:b1}
 					shardingModel.setParams(elt.getAttribute("params").replace(";", ",").toLowerCase().split("\\,"));
@@ -1042,7 +1025,12 @@ public class SqlXMLConfigParse {
 		}
 		Element link = (Element) linkNode.item(0);
 		LinkModel linkModel = new LinkModel();
-		linkModel.setColumn(link.getAttribute("column"));
+		//update 2020-09-07 增加支持多列场景(兼容旧的模式)
+		if (link.hasAttribute("column")) {
+			linkModel.setColumns(trimParams(link.getAttribute("column").split("\\,")));
+		} else if (link.hasAttribute("columns")) {
+			linkModel.setColumns(trimParams(link.getAttribute("columns").split("\\,")));
+		}
 		if (link.hasAttribute("id-column")) {
 			linkModel.setIdColumn(link.getAttribute("id-column"));
 		}
@@ -1134,7 +1122,7 @@ public class SqlXMLConfigParse {
 				elt = (Element) elements.item(i);
 				eltName = elt.getNodeName();
 				// 旋转(只能进行一次旋转)
-				if (eltName.equals("pivot")) {
+				if (eltName.equals(local.concat("pivot"))) {
 					PivotModel pivotModel = new PivotModel();
 					if (elt.hasAttribute("group-columns")) {
 						pivotModel
@@ -1170,7 +1158,7 @@ public class SqlXMLConfigParse {
 					pivotModel.setPivotCols(pivotCols);
 					resultProcessor.add(pivotModel);
 				} // 列转行
-				else if (eltName.equals("unpivot")) {
+				else if (eltName.equals(local.concat("unpivot"))) {
 					UnpivotModel unpivotModel = new UnpivotModel();
 					XMLUtil.setAttributes(elt, unpivotModel);
 					if (unpivotModel.getColumnsToRows().length > 1) {
@@ -1178,7 +1166,7 @@ public class SqlXMLConfigParse {
 					}
 				}
 				// 汇总合计
-				else if (eltName.equals("summary")) {
+				else if (eltName.equals(local.concat("summary"))) {
 					SummaryModel summaryModel = new SummaryModel();
 					// 是否逆向汇总
 					if (elt.hasAttribute("reverse")) {
@@ -1249,17 +1237,17 @@ public class SqlXMLConfigParse {
 					}
 					resultProcessor.add(summaryModel);
 				} // 列与列进行比较
-				else if (eltName.equals("cols-chain-relative")) {
+				else if (eltName.equals(local.concat("cols-chain-relative"))) {
 					ColsChainRelativeModel colsRelativeModel = new ColsChainRelativeModel();
 					XMLUtil.setAttributes(elt, colsRelativeModel);
 					resultProcessor.add(colsRelativeModel);
 				} // 行与行进行比较
-				else if (eltName.equals("rows-chain-relative")) {
+				else if (eltName.equals(local.concat("rows-chain-relative"))) {
 					RowsChainRelativeModel rowsRelativeModel = new RowsChainRelativeModel();
 					XMLUtil.setAttributes(elt, rowsRelativeModel);
 					resultProcessor.add(rowsRelativeModel);
 				} // 集合数据顺序颠倒
-				else if (eltName.equals("reverse")) {
+				else if (eltName.equals(local.concat("reverse"))) {
 					ReverseModel reverseModel = new ReverseModel();
 					XMLUtil.setAttributes(elt, reverseModel);
 					resultProcessor.add(reverseModel);
@@ -1314,7 +1302,7 @@ public class SqlXMLConfigParse {
 		for (String str : strs) {
 			if (str.contains("[") && str.contains("]")) {
 				pre = str.substring(0, str.indexOf("[")).trim();
-				params = str.substring(str.indexOf("[") + 1, str.indexOf("]")).split(",");
+				params = str.substring(str.indexOf("[") + 1, str.indexOf("]")).split("\\,");
 				for (String param : params) {
 					fieldSet.add(pre.concat(".").concat(param.trim()));
 				}

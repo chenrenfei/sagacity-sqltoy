@@ -3,36 +3,24 @@
  */
 package org.sagacity.sqltoy.config;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import org.sagacity.sqltoy.SqlToyConstants;
-import org.sagacity.sqltoy.callback.ReflectPropertyHandler;
-import org.sagacity.sqltoy.config.model.SqlParamsModel;
-import org.sagacity.sqltoy.config.model.SqlToyConfig;
-import org.sagacity.sqltoy.config.model.SqlToyResult;
-import org.sagacity.sqltoy.config.model.SqlType;
-import org.sagacity.sqltoy.config.model.SqlWithAnalysis;
+import org.sagacity.sqltoy.config.model.*;
+import org.sagacity.sqltoy.model.IgnoreKeyCaseMap;
 import org.sagacity.sqltoy.plugins.function.FunctionUtils;
-import org.sagacity.sqltoy.utils.BeanUtil;
-import org.sagacity.sqltoy.utils.CollectionUtil;
-import org.sagacity.sqltoy.utils.DataSourceUtils;
-import org.sagacity.sqltoy.utils.MacroIfLogic;
-import org.sagacity.sqltoy.utils.ReservedWordsUtil;
-import org.sagacity.sqltoy.utils.SqlUtil;
-import org.sagacity.sqltoy.utils.StringUtil;
+import org.sagacity.sqltoy.plugins.id.macro.AbstractMacro;
+import org.sagacity.sqltoy.plugins.id.macro.MacroUtils;
+import org.sagacity.sqltoy.plugins.id.macro.impl.SqlLoop;
+import org.sagacity.sqltoy.utils.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * @project sagacity-sqltoy
- * @description 提供sqlToy 针对sql语句以及查询条件加工处理的通用函数
+ * @description 提供sqlToy 针对sql语句以及查询条件加工处理的通用函数(sqltoy中最关键的sql加工)
  * @author chenrf <a href="mailto:zhongxuchen@gmail.com">联系作者</a>
  * @version id:SqlConfigParseUtils.java,Revision:v1.0,Date:2009-12-14
  * @modify {Date:2010-6-10, 修改replaceNull函数}
@@ -55,6 +43,7 @@ import org.slf4j.LoggerFactory;
  * @modify {Date:2019-06-26,修复条件参数中有问号的bug，并放开条件参数名称不能是单个字母的限制}
  * @modify {Date:2019-10-11 修复@if(:name==null) 不参与逻辑判断bug }
  * @modify {Date:2020-04-14 修复三个以上 in(?) 查询，在中间的in 参数值为null时 processIn方法处理错误}
+ * @modify {Date:2020-09-23 增加@loop()组织sql功能,完善极端场景下动态组织sql的能力}
  */
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public class SqlConfigParseUtils {
@@ -90,6 +79,7 @@ public class SqlConfigParseUtils {
 	public final static Pattern BLANK_PATTERN = Pattern.compile(BLANK_REGEX);
 	public final static String VALUE_REGEX = "(?i)\\@value\\s*\\(\\s*\\?\\s*\\)";
 	public final static Pattern VALUE_PATTERN = Pattern.compile(VALUE_REGEX);
+	public final static Pattern IF_PATTERN = Pattern.compile("(?i)\\@if\\s*\\(");
 
 	public final static String BLANK = " ";
 	// 匹配时已经小写转换
@@ -99,7 +89,7 @@ public class SqlConfigParseUtils {
 	public final static Pattern ARG_NAME_PATTERN = Pattern.compile(ARG_REGEX);
 	public final static String ARG_NAME_BLANK = "? ";
 
-	// sql 拼接时判断前部分sql是否是where 结尾,update 2017-12-4 增加(?i)
+	// sql 拼接时判断前部分sql是否是where 结尾,update 2017-12-4 增加(?i)忽视大小写
 	public final static Pattern WHERE_END_PATTERN = Pattern.compile("(?i)\\Wwhere\\s*$");
 	// where 1=1 结尾模式
 	public final static Pattern WHERE_ONE_EQUAL_PATTERN = Pattern.compile("(?i)\\Wwhere\\s*1\\s*=\\s*1$");
@@ -114,6 +104,18 @@ public class SqlConfigParseUtils {
 	 * 判断sql中是否有空白、tab、回车、换行符合,如果没有则表示是一个sql id
 	 */
 	public final static Pattern SQL_ID_PATTERN = Pattern.compile("(\\s|\\t|\\r|\\n)+");
+
+	// 利用宏模式来完成@loop循环处理
+	private static Map<String, AbstractMacro> macros = new HashMap<String, AbstractMacro>();
+
+	static {
+		macros.put("@loop", new SqlLoop());
+	}
+
+	// 避免实例化
+	private SqlConfigParseUtils() {
+
+	}
 
 	/**
 	 * @todo 判断sql语句中是否存在:named 方式的参数
@@ -178,7 +180,10 @@ public class SqlConfigParseUtils {
 		// 将sql中的问号临时先替换成特殊字符
 		String questionMark = "#sqltoy_qsmark_placeholder#";
 		if (isNamedArgs) {
-			sqlParam = processNamedParamsQuery(queryStr.replaceAll(ARG_REGEX, questionMark));
+			String sql = queryStr.replaceAll(ARG_REGEX, questionMark);
+			// update 2020-09-23 处理sql中的循环
+			sql = processLoop(sql, paramsNamed, paramsValue);
+			sqlParam = processNamedParamsQuery(sql);
 		} else {
 			sqlParam = processNamedParamsQuery(queryStr);
 		}
@@ -343,8 +348,10 @@ public class SqlConfigParseUtils {
 	}
 
 	/**
-	 * @todo 判断条件是否为null,过滤sql的组合查询条件 example: select t1.* from xx_table t1 where
-	 *       #[t1.status=?] #[and t1.auditTime=?]
+	 * @todo 判断条件是否为null,过滤sql的组合查询条件 example:
+	 *       <p>
+	 *       select t1.* from xx_table t1 where #[t1.status=?] #[and t1.auditTime=?]
+	 *       </p>
 	 * @param sqlToyResult
 	 */
 	private static void processNullConditions(SqlToyResult sqlToyResult) {
@@ -378,7 +385,7 @@ public class SqlConfigParseUtils {
 				preParamCnt = StringUtil.matchCnt(preSql, ARG_NAME_PATTERN);
 				// 判断是否有@if(xx==value1||xx>=value2) 形式的逻辑判断
 				boolean logicValue = true;
-				int start = markContentSql.toLowerCase().indexOf("@if");
+				int start = StringUtil.matchIndex(markContentSql, IF_PATTERN);
 				// sql中存在逻辑判断
 				if (start > -1) {
 					int end = StringUtil.getSymMarkIndex("(", ")", markContentSql, start);
@@ -431,7 +438,7 @@ public class SqlConfigParseUtils {
 								|| (null != value && value.getClass().isArray()
 										&& CollectionUtil.convertArray(value).length == 0)
 								|| (null != value && (value instanceof Collection) && ((Collection) value).isEmpty())
-								|| (sqlhasIs && null != value && !(value instanceof java.lang.Boolean))) {
+								|| (sqlhasIs && null != value && !(value instanceof Boolean))) {
 							// sql中剔除最后部分的#[]内容
 							markContentSql = BLANK;
 							for (int k = paramCnt; k > 0; k--) {
@@ -450,7 +457,7 @@ public class SqlConfigParseUtils {
 	}
 
 	/**
-	 * @todo 将参数设置为空白
+	 * @TODO 将@blank(:paramName) 设置为" "空白输出,同时在条件数组中剔除:paramName对应位置的条件值
 	 * @param sqlToyResult
 	 */
 	private static void processBlank(SqlToyResult sqlToyResult) {
@@ -480,7 +487,7 @@ public class SqlConfigParseUtils {
 	}
 
 	/**
-	 * @todo 处理直接显示参数值:#[@value(:paramNamed) sql]
+	 * @TODO 处理直接显示参数值:#[@value(:paramNamed) sql]
 	 * @param sqlToyResult
 	 */
 	private static void processValue(SqlToyResult sqlToyResult) {
@@ -513,8 +520,31 @@ public class SqlConfigParseUtils {
 		}
 	}
 
+	// update 2020-09-22 增加sql中的循环功能,避免极为特殊场景下不必要的争议
+	// 格式:loop(:loopAry,loopContent) 和 loop(:loopArgs,loopContent,linkSign) 两种
+	// #[or @loop(:beginDates,'(startTime between :beginDates[i] and
+	// endDates[i])',or)]
 	/**
-	 * @todo 加工处理like 部分，给参数值增加%符号
+	 * @TODO 处理sql中@loop() 循环,动态组织sql进行替换
+	 * @param queryStr
+	 * @param paramsNamed
+	 * @param paramsValue
+	 * @return
+	 */
+	private static String processLoop(String queryStr, String[] paramsNamed, Object[] paramsValue) {
+		if (null == paramsValue || paramsValue.length == 0) {
+			return queryStr;
+		}
+		IgnoreKeyCaseMap<String, Object> keyValues = new IgnoreKeyCaseMap<String, Object>();
+		for (int i = 0; i < paramsNamed.length; i++) {
+			keyValues.put(paramsNamed[i], paramsValue[i]);
+		}
+		// 这里是借用业务主键生成里面的宏处理模式来解决
+		return MacroUtils.replaceMacros(queryStr, keyValues, false, macros);
+	}
+
+	/**
+	 * @TODO 加工处理like 部分，给参数值增加%符号
 	 * @param sqlToyResult
 	 */
 	private static void processLike(SqlToyResult sqlToyResult) {
@@ -541,8 +571,13 @@ public class SqlConfigParseUtils {
 	/**
 	 * update 2020-4-14 修复参数为null时,忽视了匹配的in(?)
 	 * 
-	 * @todo 处理sql 语句中的in 条件，功能有2类： 1、将字符串类型且条件值为逗号分隔的，将对应的sql 中的 in(?) 替换成in(具体的值)
+	 * @TODO 处理sql 语句中的in 条件，功能有2类:
+	 *       <p>
+	 *       1、将字符串类型且条件值为逗号分隔的，将对应的sql 中的 in(?) 替换成in(具体的值)
+	 *       </p>
+	 *       <p>
 	 *       2、如果对应in (?)位置上的参数数据时Object[] 数组类型，则将in (?)替换成 in (?,?),具体问号个数由 数组长度决定
+	 *       </p>
 	 * @param sqlToyResult
 	 */
 	private static void processIn(SqlToyResult sqlToyResult) {
@@ -594,10 +629,8 @@ public class SqlConfigParseUtils {
 				// 逗号分隔的条件参数
 				else if (paramsValue[parameterMarkCnt - 1] instanceof String) {
 					argValue = (String) paramsValue[parameterMarkCnt - 1];
-					/**
-					 * update 2012-11-15 将'xxx'(单引号) 形式的字符串纳入直接替换模式，解决因为使用combineInStr
-					 * 数组长度为1,构造出来的in 条件存在''(空白)符合直接用?参数导致的问题
-					 */
+					// update 2012-11-15 将'xxx'(单引号) 形式的字符串纳入直接替换模式，解决因为使用combineInStr
+					// 数组长度为1,构造出来的in 条件存在''(空白)符合直接用?参数导致的问题
 					if (argValue.indexOf(",") != -1 || (argValue.startsWith("'") && argValue.endsWith("'"))) {
 						partSql = (String) paramsValue[parameterMarkCnt - 1];
 						paramValueList.remove(parameterMarkCnt - 1 + incrementIndex);
@@ -702,7 +735,7 @@ public class SqlConfigParseUtils {
 	/**
 	 * @todo 将动态的sql解析组合成一个SqlToyConfig模型，以便统一处理
 	 * @param querySql
-	 * @param dialect
+	 * @param dialect  当前的数据库类型,默认为null不指定
 	 * @param sqlType
 	 * @return
 	 */
@@ -724,9 +757,8 @@ public class SqlConfigParseUtils {
 		if (StringUtil.matches(originalSql, SqlUtil.UNION_PATTERN)) {
 			sqlToyConfig.setHasUnion(SqlUtil.hasUnion(originalSql, false));
 		}
-		/**
-		 * 只有在查询模式前提下才支持fastPage机制
-		 */
+
+		// 只有在查询模式前提下才支持fastPage机制
 		if (sqlType.equals(SqlType.search)) {
 			// 判断是否有快速分页@fast 宏
 			Matcher matcher = FAST_PATTERN.matcher(originalSql);
@@ -760,12 +792,14 @@ public class SqlConfigParseUtils {
 	}
 
 	/**
-	 * @todo 提取fastWith
+	 * @todo 提取fastWith(@fast 涉及到的cte 查询,这里是很别致的地方，假如sql中存在with as t1 (),t2 (),t3 ()
+	 *       select * from @fast(t1,t2) 做count查询时将执行: with as t1(),t2 () select
+	 *       count(1) from xxx,而不会额外的多执行t3)
 	 * @param sqlToyConfig
 	 * @param dialect
 	 */
 	public static void processFastWith(SqlToyConfig sqlToyConfig, String dialect) {
-		//不存在fast 和with 不做处理
+		// 不存在fast 和with 不做处理
 		if (!sqlToyConfig.isHasFast() || !sqlToyConfig.isHasWith()) {
 			return;
 		}
@@ -807,20 +841,5 @@ public class SqlConfigParseUtils {
 				}
 			}
 		}
-	}
-
-	/**
-	 * @todo 根据sql中的参数名称，从entity对象中提取相应的值
-	 * @param paramsName
-	 * @param entity
-	 * @param reflectPropsHandler
-	 * @return
-	 */
-	public static Object[] reflectBeanParams(String[] paramsName, Serializable entity,
-			ReflectPropertyHandler reflectPropsHandler) {
-		if (null != entity && null != paramsName && paramsName.length > 0) {
-			return BeanUtil.reflectBeanToAry(entity, paramsName, null, reflectPropsHandler);
-		}
-		return null;
 	}
 }

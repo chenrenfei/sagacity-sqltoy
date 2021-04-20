@@ -3,17 +3,10 @@
  */
 package org.sagacity.sqltoy.dialect.impl;
 
-import java.io.Serializable;
-import java.sql.Connection;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-
 import org.sagacity.sqltoy.SqlToyConstants;
 import org.sagacity.sqltoy.SqlToyContext;
 import org.sagacity.sqltoy.callback.ReflectPropertyHandler;
 import org.sagacity.sqltoy.callback.RowCallbackHandler;
-import org.sagacity.sqltoy.callback.UniqueSqlHandler;
 import org.sagacity.sqltoy.callback.UpdateRowHandler;
 import org.sagacity.sqltoy.config.model.EntityMeta;
 import org.sagacity.sqltoy.config.model.PKStrategy;
@@ -35,6 +28,12 @@ import org.sagacity.sqltoy.model.StoreResult;
 import org.sagacity.sqltoy.utils.SqlUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.Serializable;
+import java.sql.Connection;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
 /**
  * @project sqltoy-orm
@@ -60,19 +59,15 @@ public class Oracle11gDialect implements Dialect {
 
 	@Override
 	public boolean isUnique(SqlToyContext sqlToyContext, Serializable entity, String[] paramsNamed, Connection conn,
-			Integer dbType, String tableName) {
+			final Integer dbType, String tableName) {
 		return DialectUtils.isUnique(sqlToyContext, entity, paramsNamed, conn, dbType, tableName,
-				new UniqueSqlHandler() {
-					@Override
-					public String process(EntityMeta entityMeta, String[] realParamNamed, String tableName,
-							Integer dbType, int topSize) {
-						StringBuilder sql = new StringBuilder();
-						sql.append("SELECT sag_uniqueTop.* FROM ( ");
-						sql.append(DialectExtUtils.wrapUniqueSql(entityMeta, realParamNamed, dbType, tableName));
-						sql.append(") sag_uniqueTop where ROWNUM <=");
-						sql.append(topSize);
-						return sql.toString();
-					}
+				(entityMeta, realParamNamed, table, topSize) -> {
+					StringBuilder sql = new StringBuilder();
+					sql.append("SELECT sag_uniqueTop.* FROM ( ");
+					sql.append(DialectExtUtils.wrapUniqueSql(entityMeta, realParamNamed, dbType, table));
+					sql.append(") sag_uniqueTop where ROWNUM <=");
+					sql.append(topSize);
+					return sql.toString();
 				});
 	}
 
@@ -281,7 +276,7 @@ public class Oracle11gDialect implements Dialect {
 							pkStrategy = PKStrategy.SEQUENCE;
 							sequence = entityMeta.getFieldsMeta().get(entityMeta.getIdArray()[0]).getDefaultValue();
 						}
-						return DialectUtils.getSaveIgnoreExistSql(dbType, entityMeta, pkStrategy, VIRTUAL_TABLE,
+						return DialectExtUtils.getSaveIgnoreExistSql(dbType, entityMeta, pkStrategy, VIRTUAL_TABLE,
 								NVL_FUNCTION, sequence, isAssignPKValue(pkStrategy), tableName);
 					}
 				}, reflectPropertyHandler, conn, dbType, autoCommit);
@@ -370,15 +365,16 @@ public class Oracle11gDialect implements Dialect {
 		// oracle12c 开始支持identity机制
 		EntityMeta entityMeta = sqlToyContext.getEntityMeta(entities.get(0).getClass());
 		PKStrategy pkStrategy = entityMeta.getIdStrategy();
+		boolean isAssignPK = isAssignPKValue(pkStrategy);
 		String sequence = entityMeta.getSequence() + NEXTVAL;
 		if (pkStrategy != null && pkStrategy.equals(PKStrategy.IDENTITY)) {
 			pkStrategy = PKStrategy.SEQUENCE;
 			sequence = entityMeta.getFieldsMeta().get(entityMeta.getIdArray()[0]).getDefaultValue();
 		}
 		String insertSql = DialectExtUtils.generateInsertSql(dbType, entityMeta, pkStrategy, NVL_FUNCTION, sequence,
-				isAssignPKValue(pkStrategy), tableName);
-		return DialectUtils.saveAll(sqlToyContext, entityMeta, pkStrategy, isAssignPKValue(pkStrategy), insertSql,
-				entities, batchSize, reflectPropertyHandler, conn, dbType, autoCommit);
+				isAssignPK, tableName);
+		return DialectUtils.saveAll(sqlToyContext, entityMeta, pkStrategy, isAssignPK, insertSql, entities, batchSize,
+				reflectPropertyHandler, conn, dbType, autoCommit);
 	}
 
 	/*

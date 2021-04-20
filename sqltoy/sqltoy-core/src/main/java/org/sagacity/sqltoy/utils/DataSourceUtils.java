@@ -81,6 +81,10 @@ public class DataSourceUtils {
         public final static String SYBASE_IQ = "sybase_iq";
 
         public final static String UNDEFINE = "UNDEFINE";
+
+
+        // 人大金仓数据库
+        public final static String KINGBASE = "kingbase";
     }
 
     /*
@@ -121,6 +125,9 @@ public class DataSourceUtils {
 
         // 下面将逐步淘汰
         public final static int SYBASE_IQ = 140;
+
+        // 人大金仓数据库
+        public final static int KINGBASE = 120;
     }
 
     public static HashMap<String, Integer> DBNameTypeMap = new HashMap<String, Integer>();
@@ -152,6 +159,8 @@ public class DataSourceUtils {
         DBNameTypeMap.put(Dialect.UNDEFINE, DBType.UNDEFINE);
         // 纳入将不再支持范围
         DBNameTypeMap.put(Dialect.SYBASE_IQ, DBType.SYBASE_IQ);
+        // 2020-8-14 增加对人大金仓数据库支持
+        DBNameTypeMap.put(Dialect.KINGBASE, DBType.KINGBASE);
     }
 
     /**
@@ -296,6 +305,9 @@ public class DataSourceUtils {
                     && StringUtil.indexOfIgnoreCase(dbDialect, "iq") != -1)) {
                 return Dialect.SYBASE_IQ;
             }
+            if (StringUtil.indexOfIgnoreCase(dbDialect, Dialect.KINGBASE) != -1) {
+                return Dialect.KINGBASE;
+            }
         }
         return Dialect.UNDEFINE;
     }
@@ -399,6 +411,76 @@ public class DataSourceUtils {
         }
         return DBNameTypeMap.get(dialect.toLowerCase());
     }
+    /**
+     * @todo <b>获取数据库类型</b>
+     * @param conn
+     * @return
+     * @throws SQLException
+     */
+    public static int getDBType(final Connection conn) throws SQLException {
+        // 从hashMap中获取
+        String productName = conn.getMetaData().getDatabaseProductName();
+        int majorVersion = getDBVersion(conn);
+        String dbKey = productName + majorVersion;
+        if (!DBNameTypeMap.containsKey(dbKey)) {
+            String dbDialect = getCurrentDBDialect(conn);
+            int dbType = DBType.UNDEFINE;
+            // oracle
+            if (dbDialect.equals(Dialect.ORACLE)) {
+                dbType = DBType.ORACLE;
+                if (majorVersion <= 11) {
+                    dbType = DBType.ORACLE11;
+                }
+            }
+            // mysql以及mysql的分支数据库
+            else if (dbDialect.equals(Dialect.MYSQL)) {
+                dbType = DBType.MYSQL;
+                if (majorVersion <= 5) {
+                    dbType = DBType.MYSQL57;
+                }
+            }
+            // 9.5以上为标准支持模式
+            else if (dbDialect.equals(Dialect.POSTGRESQL)) {
+                dbType = DBType.POSTGRESQL;
+            }
+            // sqlserver,只支持2012或以上版本
+            else if (dbDialect.equals(Dialect.SQLSERVER)) {
+                // 2014+
+                dbType = DBType.SQLSERVER;
+            }
+            // db2 10+版本
+            else if (dbDialect.equals(Dialect.DB2)) {
+                dbType = DBType.DB2;
+            }
+            // CLICKHOUSE
+            else if (dbDialect.equals(Dialect.CLICKHOUSE)) {
+                dbType = DBType.CLICKHOUSE;
+            }
+            // OCEANBASE
+            else if (dbDialect.equals(Dialect.OCEANBASE)) {
+                dbType = DBType.OCEANBASE;
+            }
+            // GAUSSDB
+            else if (dbDialect.equals(Dialect.GAUSSDB)) {
+                dbType = DBType.GAUSSDB;
+            }
+            // sqlite
+            else if (dbDialect.equals(Dialect.SQLITE)) {
+                dbType = DBType.SQLITE;
+            } // dm
+            else if (dbDialect.equals(Dialect.DM)) {
+                dbType = DBType.DM;
+            } // TIDB
+            else if (dbDialect.equals(Dialect.TIDB)) {
+                dbType = DBType.TIDB;
+            } // sybase IQ
+            else if (dbDialect.equals(Dialect.SYBASE_IQ)) {
+                dbType = DBType.SYBASE_IQ;
+            }
+            DBNameTypeMap.put(dbKey, dbType);
+        }
+        return DBNameTypeMap.get(dbKey);
+    }
 
     /**
      * @todo 获取不同数据库validator语句
@@ -472,5 +554,66 @@ public class DataSourceUtils {
         }
         // 返回反调的结果
         return handler.getResult();
+    }
+
+    /**
+     * @TDDO 获取数据库类型的名称
+     * @param datasource
+     * @return
+     */
+    public static String getDialect(DataSource datasource) {
+        if (datasource == null) {
+            return "";
+        }
+        String connectionManagerName = SqlToyContext.getInstance().getConnectionManagerName();
+        ConnectionManager connectionManager = ConnectionManager.getConnectionManager(connectionManagerName);
+        Connection conn = null;
+        try {
+            conn = connectionManager.getConnection(datasource);
+            if (conn == null) {
+                return "";
+            }
+            int dbType = getDBType(conn);
+            switch (dbType) {
+                case DBType.DB2:
+                    return Dialect.DB2;
+                case DBType.ORACLE:
+                case DBType.ORACLE11:
+                    return Dialect.ORACLE;
+                case DBType.POSTGRESQL:
+                    return Dialect.POSTGRESQL;
+                case DBType.MYSQL:
+                case DBType.MYSQL57:
+                    return Dialect.MYSQL;
+                case DBType.SQLSERVER:
+                    return Dialect.SQLSERVER;
+                case DBType.SQLITE:
+                    return Dialect.SQLITE;
+                case DBType.CLICKHOUSE:
+                    return Dialect.CLICKHOUSE;
+                case DBType.TIDB:
+                    return Dialect.TIDB;
+                case DBType.OCEANBASE:
+                    return Dialect.OCEANBASE;
+                case DBType.DM:
+                    return Dialect.DM;
+                case DBType.KINGBASE:
+                    return Dialect.KINGBASE;
+                default:
+                    return "";
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+//            org.springframework.jdbc.datasource.DataSourceUtils.releaseConnection(conn, datasource);
+            connectionManager.releaseConnection(conn, datasource);
+            conn = null;
+            throw new RuntimeException(e);
+        } finally {
+            // 释放连接,连接池实际是归还连接，未必一定关闭
+//            org.springframework.jdbc.datasource.DataSourceUtils.releaseConnection(conn, datasource);
+            connectionManager.releaseConnection(conn, datasource);
+        }
+
+
     }
 }

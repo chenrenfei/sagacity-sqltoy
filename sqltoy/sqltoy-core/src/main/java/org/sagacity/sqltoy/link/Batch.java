@@ -3,16 +3,15 @@
  */
 package org.sagacity.sqltoy.link;
 
-import java.util.List;
-
-import javax.sql.DataSource;
-
 import org.sagacity.sqltoy.SqlToyContext;
 import org.sagacity.sqltoy.callback.InsertRowCallbackHandler;
 import org.sagacity.sqltoy.callback.ReflectPropertyHandler;
 import org.sagacity.sqltoy.config.model.SqlToyConfig;
 import org.sagacity.sqltoy.config.model.SqlType;
 import org.sagacity.sqltoy.utils.StringUtil;
+
+import javax.sql.DataSource;
+import java.util.List;
 
 /**
  * @project sagacity-sqltoy
@@ -106,7 +105,7 @@ public class Batch extends BaseLink {
 			throw new IllegalArgumentException("batch execute sql is null!");
 		}
 		int realBatchSize = (batchSize > 0) ? batchSize : sqlToyContext.getBatchSize();
-		SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sql, SqlType.update);
+		SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sql, SqlType.update, super.getDialect());
 		return dialectFactory.batchUpdate(sqlToyContext, sqlToyConfig, dataSet, realBatchSize, reflectPropertyHandler,
 				insertCallhandler, autoCommit, getDataSource(sqlToyConfig));
 	}

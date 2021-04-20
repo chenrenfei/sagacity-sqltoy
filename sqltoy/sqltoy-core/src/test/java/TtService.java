@@ -9,8 +9,8 @@ public class TtService {
         SysLocationVO sysLocationVO = new SysLocationVO();
 //        sysLocationVO.setLocationId(1L);
         sysLocationVO.setLocationName("ddddd");
-        sysLocationVO.setOnlinePersion(0L);
-        sysLocationVO.setTotalPersion(0L);
+//        sysLocationVO.setOnlinePersion(0L);
+//        sysLocationVO.setTotalPersion(0L);
         QueryHelper.save(sysLocationVO);
         QueryHelper.flush();
 //        QueryHelper.read(sysLocationVO);

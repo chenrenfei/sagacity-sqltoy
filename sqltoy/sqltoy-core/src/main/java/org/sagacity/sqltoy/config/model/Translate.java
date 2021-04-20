@@ -3,10 +3,10 @@
  */
 package org.sagacity.sqltoy.config.model;
 
-import java.io.Serializable;
-
 import org.sagacity.sqltoy.model.TranslateExtend;
 import org.sagacity.sqltoy.utils.StringUtil;
+
+import java.io.Serializable;
 
 /**
  * @project sqltoy-orm

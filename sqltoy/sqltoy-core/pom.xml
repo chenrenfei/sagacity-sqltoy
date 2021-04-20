@@ -6,11 +6,26 @@
     <parent>
         <groupId>com.sagframe</groupId>
         <artifactId>sqltoy</artifactId>
-        <version>v0.0.1</version>
+        <version>0.0.4-SNAPSHOT</version>
     </parent>
 
     <artifactId>sqltoy-core</artifactId>
-
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
     <dependencies>
         <dependency>
             <groupId>org.ehcache</groupId>

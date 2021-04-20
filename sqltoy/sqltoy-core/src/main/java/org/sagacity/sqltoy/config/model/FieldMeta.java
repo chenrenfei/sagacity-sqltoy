@@ -3,9 +3,9 @@
  */
 package org.sagacity.sqltoy.config.model;
 
-import java.io.Serializable;
-
 import org.sagacity.sqltoy.SqlToyConstants;
+
+import java.io.Serializable;
 
 /**
  * @project sqltoy-orm

@@ -3,6 +3,12 @@
  */
 package org.sagacity.sqltoy.utils;
 
+import org.sagacity.sqltoy.SqlToyConstants;
+import org.sagacity.sqltoy.config.model.EntityMeta;
+import org.sagacity.sqltoy.config.model.SqlToyConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -11,12 +17,6 @@ import java.sql.SQLException;
 import java.time.LocalTime;
 import java.util.Date;
 import java.util.List;
-
-import org.sagacity.sqltoy.SqlToyConstants;
-import org.sagacity.sqltoy.config.model.EntityMeta;
-import org.sagacity.sqltoy.config.model.SqlToyConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @project sqltoy-orm
@@ -30,6 +30,9 @@ public class SqlUtilsExt {
 	 * 定义日志
 	 */
 	private final static Logger logger = LoggerFactory.getLogger(SqlUtilsExt.class);
+
+	private SqlUtilsExt() {
+	}
 
 	/**
 	 * @todo 通过jdbc方式批量插入数据，一般提供给数据采集时或插入临时表使用
@@ -74,6 +77,7 @@ public class SqlUtilsExt {
 			Object cellValue;
 			int fieldType;
 			boolean hasFieldType = (fieldsType != null);
+			int[] updateRows;
 			for (int i = 0; i < totalRows; i++) {
 				rowData = rowDatas.get(i);
 				if (rowData != null) {
@@ -94,7 +98,7 @@ public class SqlUtilsExt {
 						pst.addBatch();
 						// 判断是否是最后一条记录或到达批次量,执行批处理
 						if ((meter % batchSize) == 0 || i + 1 == totalRows) {
-							int[] updateRows = pst.executeBatch();
+							updateRows = pst.executeBatch();
 							for (int t : updateRows) {
 								updateCount = updateCount + ((t > 0) ? t : 0);
 							}
@@ -169,6 +173,7 @@ public class SqlUtilsExt {
 			int index = 0;
 			Object cellValue;
 			int fieldType;
+			int[] updateRows;
 			boolean hasFieldType = (fieldsType != null);
 			for (int i = 0; i < totalRows; i++) {
 				rowData = rowDatas.get(i);
@@ -208,7 +213,7 @@ public class SqlUtilsExt {
 						pst.addBatch();
 						// 判断是否是最后一条记录或到达批次量,执行批处理
 						if ((meter % batchSize) == 0 || i + 1 == totalRows) {
-							int[] updateRows = pst.executeBatch();
+							updateRows = pst.executeBatch();
 							for (int t : updateRows) {
 								updateCount = updateCount + ((t > 0) ? t : 0);
 							}
@@ -308,7 +313,8 @@ public class SqlUtilsExt {
 	 * @return
 	 */
 	public static String signSql(String sql, Integer dbType, SqlToyConfig sqlToyConfig) {
-		// 判断是否打开sql签名,提供开发者通过SqlToyContext dialectProperties设置:sqltoy.open.sqlsign=false 来关闭
+		// 判断是否打开sql签名,提供开发者通过SqlToyContext
+		// dialectProperties设置:sqltoy.open.sqlsign=false 来关闭
 		if (!SqlToyConstants.openSqlSign()) {
 			return sql;
 		}

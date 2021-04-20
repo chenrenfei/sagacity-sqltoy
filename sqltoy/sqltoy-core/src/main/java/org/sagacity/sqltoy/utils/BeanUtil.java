@@ -3,9 +3,14 @@
  */
 package org.sagacity.sqltoy.utils;
 
-import static java.lang.System.err;
+import org.sagacity.sqltoy.callback.ReflectPropertyHandler;
+import org.sagacity.sqltoy.config.annotation.SqlToyEntity;
+import org.sagacity.sqltoy.config.model.EntityMeta;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
+import java.io.Serializable;
 import java.io.StringWriter;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -15,17 +20,10 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.sagacity.sqltoy.callback.ReflectPropertyHandler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static java.lang.System.err;
 
 /**
  * @project sagacity-sqltoy4.0
@@ -52,6 +50,11 @@ public class BeanUtil {
 	 * 保存get方法
 	 */
 	private static ConcurrentHashMap<String, Method> getMethods = new ConcurrentHashMap<String, Method>();
+
+	// 静态方法避免实例化和继承
+	private BeanUtil() {
+
+	}
 
 	/**
 	 * <p>
@@ -350,7 +353,7 @@ public class BeanUtil {
 				java.sql.Clob clob = (java.sql.Clob) paramValue;
 				return clob.getSubString((long) 1, (int) clob.length());
 			}
-			if (paramValue instanceof java.util.Date) {
+			if (paramValue instanceof Date) {
 				return DateUtil.formatDate(paramValue, "yyyy-MM-dd HH:mm:ss");
 			}
 			return valueStr;
@@ -379,11 +382,11 @@ public class BeanUtil {
 		}
 		// 第六
 		if (typeName.equals("java.sql.timestamp") || typeName.equals("timestamp")) {
-			if (paramValue instanceof java.sql.Timestamp) {
-				return (java.sql.Timestamp) paramValue;
+			if (paramValue instanceof Timestamp) {
+				return (Timestamp) paramValue;
 			}
-			if (paramValue instanceof java.util.Date) {
-				return new Timestamp(((java.util.Date) paramValue).getTime());
+			if (paramValue instanceof Date) {
+				return new Timestamp(((Date) paramValue).getTime());
 			}
 			if (paramValue.getClass().getName().toLowerCase().equals("oracle.sql.timestamp")) {
 				return oracleTimeStampConvert(paramValue);
@@ -394,14 +397,14 @@ public class BeanUtil {
 			return Double.valueOf(valueStr);
 		}
 		if (typeName.equals("java.util.date") || typeName.equals("date")) {
-			if (paramValue instanceof java.util.Date) {
-				return (java.util.Date) paramValue;
+			if (paramValue instanceof Date) {
+				return (Date) paramValue;
 			}
 			if (paramValue instanceof Number) {
-				return new java.util.Date(((Number) paramValue).longValue());
+				return new Date(((Number) paramValue).longValue());
 			}
 			if (paramValue.getClass().getName().toLowerCase().equals("oracle.sql.timestamp")) {
-				return new java.util.Date(oracleDateConvert(paramValue).getTime());
+				return new Date(oracleDateConvert(paramValue).getTime());
 			}
 			return DateUtil.parseString(valueStr);
 		}
@@ -485,8 +488,8 @@ public class BeanUtil {
 			if (paramValue instanceof java.sql.Date) {
 				return (java.sql.Date) paramValue;
 			}
-			if (paramValue instanceof java.util.Date) {
-				return new java.sql.Date(((java.util.Date) paramValue).getTime());
+			if (paramValue instanceof Date) {
+				return new java.sql.Date(((Date) paramValue).getTime());
 			}
 
 			if (paramValue.getClass().getName().toLowerCase().equals("oracle.sql.timestamp")) {
@@ -501,8 +504,8 @@ public class BeanUtil {
 			if (paramValue instanceof java.sql.Time) {
 				return (java.sql.Time) paramValue;
 			}
-			if (paramValue instanceof java.util.Date) {
-				return new java.sql.Time(((java.util.Date) paramValue).getTime());
+			if (paramValue instanceof Date) {
+				return new java.sql.Time(((Date) paramValue).getTime());
 			}
 
 			if (paramValue.getClass().getName().toLowerCase().equals("oracle.sql.timestamp")) {
@@ -669,6 +672,9 @@ public class BeanUtil {
 	 */
 	public static Object[] reflectBeanToAry(Object serializable, String[] properties, Object[] defaultValues,
 			ReflectPropertyHandler reflectPropertyHandler) {
+		if (null == serializable || null == properties || properties.length == 0) {
+			return null;
+		}
 		List datas = new ArrayList();
 		datas.add(serializable);
 		List result = reflectBeansToInnerAry(datas, properties, defaultValues, reflectPropertyHandler, false, 0);
@@ -901,7 +907,7 @@ public class BeanUtil {
 				index++;
 			}
 		} catch (Exception e) {
-			logger.error("将集合数据{}反射到Java Bean的属性{}过程异常!{}", cellData, propertyName, e.getMessage());
+			logger.error("将集合单元格数据:{} 反射到Java Bean的属性:{}过程异常!{}", cellData, propertyName, e.getMessage());
 			e.printStackTrace();
 			throw new RuntimeException(e);
 		}
@@ -1193,5 +1199,66 @@ public class BeanUtil {
 			getMethods.put(key, method);
 		}
 		return method.invoke(bean);
+	}
+
+	/**
+	 * @TODO 为loadByIds提供Entity集合封装,便于将调用方式统一
+	 * @param <T>
+	 * @param entityMeta
+	 * @param voClass
+	 * @param ids
+	 * @return
+	 */
+	public static <T extends Serializable> List<T> wrapEntities(EntityMeta entityMeta, Class<T> voClass,
+			Object... ids) {
+		List<T> entities = new ArrayList<T>();
+		Set<Object> repeat = new HashSet<Object>();
+		try {
+			// 获取主键的set方法
+			Method method = BeanUtil.matchSetMethods(voClass, entityMeta.getIdArray())[0];
+			String typeName = method.getParameterTypes()[0].getName().toLowerCase();
+			T bean;
+			for (Object id : ids) {
+				// 去除重复
+				if (!repeat.contains(id)) {
+					bean = voClass.getDeclaredConstructor().newInstance();
+					method.invoke(bean, BeanUtil.convertType(id, typeName));
+					entities.add(bean);
+					repeat.add(id);
+				}
+			}
+		} catch (Exception e) {
+			logger.error("将集合数据反射到Java Bean过程异常!{}", e.getMessage());
+			throw new RuntimeException(e);
+		}
+		return entities;
+	}
+
+	/**
+	 * @TODO 获取VO对应的Class
+	 * @param entityClass
+	 * @return
+	 */
+	public static Class getEntityClass(Class entityClass) {
+		// update 2020-9-16
+		// 主要规避VO对象{{}}模式初始化，导致Class获取变成了内部类(双括号实例化modifiers会等于0)
+		if (entityClass == null || entityClass.getModifiers() != 0) {
+			return entityClass;
+		}
+		Class realEntityClass = entityClass;
+		// 通过逐层递归来判断是否SqlToy annotation注解所规定的关联数据库的实体类
+		// 即@Entity 注解的抽象类
+		boolean isEntity = realEntityClass.isAnnotationPresent(SqlToyEntity.class);
+		while (!isEntity) {
+			realEntityClass = realEntityClass.getSuperclass();
+			if (realEntityClass == null) {
+				break;
+			}
+			isEntity = realEntityClass.isAnnotationPresent(SqlToyEntity.class);
+		}
+		if (isEntity) {
+			return realEntityClass;
+		}
+		return entityClass;
 	}
 }

@@ -625,6 +625,11 @@ public class SqlToyCoreLazyDaoImpl extends BaseCoreDaoSupport implements SqlToyC
         super.rollback();
     }
 
+    @Override
+    public void closeConnection(){
+        super.closeConnection();;
+    }
+
     /*
      * (non-Javadoc)
      *

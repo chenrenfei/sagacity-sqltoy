@@ -3,17 +3,6 @@
  */
 package org.sagacity.sqltoy.utils;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import org.sagacity.sqltoy.SqlToyConstants;
 import org.sagacity.sqltoy.SqlToyContext;
 import org.sagacity.sqltoy.config.SqlConfigParseUtils;
@@ -24,6 +13,13 @@ import org.sagacity.sqltoy.config.model.Translate;
 import org.sagacity.sqltoy.model.TranslateExtend;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @project sagacity-sqltoy4.1
@@ -49,6 +45,9 @@ public class MongoElasticUtils {
 	private final static String SQL_PSEUDO_END_MARK = "]";
 	private final static String MQL_PSEUDO_END_MARK = "</#>";
 	private final static String BLANK = " ";
+
+	private MongoElasticUtils() {
+	}
 
 	private static SqlToyResult wrapNoSql(SqlToyConfig sqlToyConfig, String[] paramNames, Object[] paramValues) {
 		String mql = sqlToyConfig.getSql(null);
@@ -412,7 +411,7 @@ public class MongoElasticUtils {
 		HashMap<String, HashMap<String, Object[]>> translateCache = null;
 		// 存在缓存翻译,获取缓存数据
 		if (!sqlToyConfig.getTranslateMap().isEmpty()) {
-			translateCache = sqlToyContext.getTranslateManager().getTranslates(sqlToyContext, null, translateMap);
+			translateCache = sqlToyContext.getTranslateManager().getTranslates(null, translateMap);
 			if (translateCache == null || translateCache.isEmpty()) {
 				logger.warn("mongo or elastic cache:{} has no data!{}", translateMap.keySet(), sqlToyConfig.getSql());
 			} else {

@@ -3,15 +3,9 @@
  */
 package org.sagacity.sqltoy.translate;
 
-import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import org.sagacity.sqltoy.SqlToyContext;
 import org.sagacity.sqltoy.config.model.SqlToyConfig;
 import org.sagacity.sqltoy.config.model.SqlType;
@@ -20,17 +14,12 @@ import org.sagacity.sqltoy.executor.QueryExecutor;
 import org.sagacity.sqltoy.translate.model.CacheCheckResult;
 import org.sagacity.sqltoy.translate.model.CheckerConfigModel;
 import org.sagacity.sqltoy.translate.model.TranslateConfigModel;
-import org.sagacity.sqltoy.utils.BeanUtil;
-import org.sagacity.sqltoy.utils.CollectionUtil;
-import org.sagacity.sqltoy.utils.DateUtil;
-import org.sagacity.sqltoy.utils.HttpClientUtils;
-import org.sagacity.sqltoy.utils.StringUtil;
+import org.sagacity.sqltoy.utils.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONArray;
-import com.alibaba.fastjson.JSONObject;
+import java.sql.Timestamp;
+import java.util.*;
 
 /**
  * @project sagacity-sqltoy4.2
@@ -47,52 +36,56 @@ public class TranslateFactory {
 	/**
 	 * @todo 执行检测,返回缓存相关数据最后修改时间,便于比较是否发生变化
 	 * @param sqlToyContext
-	 * @param config
+	 * @param checkerConfig
 	 * @param preCheckTime
 	 * @return
 	 */
-	public static List<CacheCheckResult> doCheck(final SqlToyContext sqlToyContext, final CheckerConfigModel config,
-			Timestamp preCheckTime) {
+	public static List<CacheCheckResult> doCheck(final SqlToyContext sqlToyContext,
+			final CheckerConfigModel checkerConfig, Timestamp preCheckTime) {
 		List result = null;
 		try {
-			if (config.getType().equals("sql")) {
-				result = doSqlCheck(sqlToyContext, config, preCheckTime);
-			} else if (config.getType().equals("service")) {
-				result = doServiceCheck(sqlToyContext, config, preCheckTime);
-			} else if (config.getType().equals("rest")) {
-				result = doRestCheck(sqlToyContext, config, preCheckTime);
+			// 直接sql查询加载缓存模式
+			if (checkerConfig.getType().equals("sql")) {
+				result = doSqlCheck(sqlToyContext, checkerConfig, preCheckTime);
+			} // 调用springBean模式
+			else if (checkerConfig.getType().equals("service")) {
+				result = doServiceCheck(sqlToyContext, checkerConfig, preCheckTime);
+			} // 调用rest请求模式
+			else if (checkerConfig.getType().equals("rest")) {
+				result = doRestCheck(sqlToyContext, checkerConfig, preCheckTime);
 			}
+			// local模式由应用自行管理
 		} catch (Exception e) {
 			e.printStackTrace();
 			logger.error("执行缓存变更检测发生错误,错误信息:{}", e.getMessage());
 		}
 
 		// 增量更新模式
-		if (config.isIncrement()) {
-			return wrapIncrementCheckResult(result, config);
+		if (checkerConfig.isIncrement()) {
+			return wrapIncrementCheckResult(result, checkerConfig);
 		}
 		// 清空模式
-		return wrapClearCheckResult(result, config);
+		return wrapClearCheckResult(result, checkerConfig);
 	}
 
 	/**
 	 * @todo 执行sql检测
 	 * @param sqlToyContext
-	 * @param config
+	 * @param checkerConfig
 	 * @param preCheckTime
 	 * @return
 	 * @throws Exception
 	 */
-	private static List doSqlCheck(final SqlToyContext sqlToyContext, final CheckerConfigModel config,
+	private static List doSqlCheck(final SqlToyContext sqlToyContext, final CheckerConfigModel checkerConfig,
 			Timestamp preCheckTime) throws Exception {
-		final SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(config.getSql(), SqlType.search);
-		String dataSourceName = config.getDataSource();
+		final SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(checkerConfig.getSql(), SqlType.search, "");
+		String dataSourceName = checkerConfig.getDataSource();
 		if (dataSourceName == null) {
 			dataSourceName = sqlToyConfig.getDataSource();
 		}
 		return DialectFactory.getInstance()
 				.findByQuery(sqlToyContext,
-						new QueryExecutor(config.getSql(), sqlToyConfig.getParamsName(),
+						new QueryExecutor(checkerConfig.getSql(), sqlToyConfig.getParamsName(),
 								new Object[] { new Date(preCheckTime.getTime()) }),
 						sqlToyConfig, null, StringUtil.isBlank(dataSourceName) ? sqlToyContext.obtainDataSource()
 								: sqlToyContext.getDataSourceBean(dataSourceName))
@@ -102,31 +95,31 @@ public class TranslateFactory {
 	/**
 	 * @todo 执行基于service调用的检测
 	 * @param sqlToyContext
-	 * @param config
+	 * @param checkerConfig
 	 * @param preCheckTime
 	 * @return
 	 * @throws Exception
 	 */
-	private static List doServiceCheck(final SqlToyContext sqlToyContext, final CheckerConfigModel config,
+	private static List doServiceCheck(final SqlToyContext sqlToyContext, final CheckerConfigModel checkerConfig,
 			Timestamp preCheckTime) throws Exception {
-		return (List) sqlToyContext.getServiceData(config.getService(), config.getMethod(),
+		return (List) sqlToyContext.getServiceData(checkerConfig.getService(), checkerConfig.getMethod(),
 				new Object[] { preCheckTime });
 	}
 
 	/**
 	 * @todo 执行基于rest请求模式的缓存更新检测
 	 * @param sqlToyContext
-	 * @param config
+	 * @param checkerConfig
 	 * @param preCheckTime
 	 * @return
 	 * @throws Exception
 	 */
-	private static List doRestCheck(final SqlToyContext sqlToyContext, final CheckerConfigModel config,
+	private static List doRestCheck(final SqlToyContext sqlToyContext, final CheckerConfigModel checkerConfig,
 			Timestamp preCheckTime) throws Exception {
 		String[] paramNames = { "lastUpdateTime" };
 		String[] paramValues = { DateUtil.formatDate(preCheckTime, "yyyy-MM-dd HH:mm:ss.SSS") };
-		String jsonStr = HttpClientUtils.doPost(sqlToyContext, config.getUrl(), config.getUsername(),
-				config.getPassword(), paramNames, paramValues);
+		String jsonStr = HttpClientUtils.doPost(sqlToyContext, checkerConfig.getUrl(), checkerConfig.getUsername(),
+				checkerConfig.getPassword(), paramNames, paramValues);
 		if (jsonStr == null) {
 			return null;
 		}
@@ -154,10 +147,10 @@ public class TranslateFactory {
 	/**
 	 * @todo 包装检测结果为统一的对象集合
 	 * @param result
-	 * @param config
+	 * @param checkerConfig
 	 * @return
 	 */
-	private static List<CacheCheckResult> wrapClearCheckResult(List result, CheckerConfigModel config) {
+	private static List<CacheCheckResult> wrapClearCheckResult(List result, CheckerConfigModel checkerConfig) {
 		if (result == null || result.isEmpty()) {
 			return null;
 		}
@@ -169,8 +162,8 @@ public class TranslateFactory {
 			cacheSet = result;
 		} else if (result.get(0) instanceof List) {
 			cacheSet = CollectionUtil.innerListToArray(result);
-		} else if (config.getProperties() != null && config.getProperties().length > 0) {
-			cacheSet = BeanUtil.reflectBeansToInnerAry(result, config.getProperties(), null, null, false, 0);
+		} else if (checkerConfig.getProperties() != null && checkerConfig.getProperties().length > 0) {
+			cacheSet = BeanUtil.reflectBeansToInnerAry(result, checkerConfig.getProperties(), null, null, false, 0);
 		}
 		if (cacheSet == null) {
 			return null;
@@ -193,10 +186,10 @@ public class TranslateFactory {
 	/**
 	 * @todo 包装检测结果为统一的对象集合
 	 * @param result
-	 * @param config
+	 * @param checkerConfig
 	 * @return
 	 */
-	private static List<CacheCheckResult> wrapIncrementCheckResult(List result, CheckerConfigModel config) {
+	private static List<CacheCheckResult> wrapIncrementCheckResult(List result, CheckerConfigModel checkerConfig) {
 		if (result == null || result.isEmpty()) {
 			return null;
 		}
@@ -208,14 +201,14 @@ public class TranslateFactory {
 			cacheSet = CollectionUtil.innerListToArray(result);
 		} else if (result.get(0) instanceof Object[]) {
 			cacheSet = result;
-		} else if (config.getProperties() != null && config.getProperties().length > 0) {
-			cacheSet = BeanUtil.reflectBeansToInnerAry(result, config.getProperties(), null, null, false, 0);
+		} else if (checkerConfig.getProperties() != null && checkerConfig.getProperties().length > 0) {
+			cacheSet = BeanUtil.reflectBeansToInnerAry(result, checkerConfig.getProperties(), null, null, false, 0);
 		}
 		if (cacheSet == null) {
 			return null;
 		}
-		String cacheName = config.getCache();
-		boolean hasInsideGroup = config.isHasInsideGroup();
+		String cacheName = checkerConfig.getCache();
+		boolean hasInsideGroup = checkerConfig.isHasInsideGroup();
 		List<CacheCheckResult> checkResult = new ArrayList<CacheCheckResult>();
 		Object[] row;
 		CacheCheckResult item;
@@ -280,7 +273,7 @@ public class TranslateFactory {
 	 */
 	private static List getSqlCacheData(final SqlToyContext sqlToyContext, TranslateConfigModel cacheModel,
 			String cacheType) throws Exception {
-		final SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(cacheModel.getSql(), SqlType.search);
+		final SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(cacheModel.getSql(), SqlType.search, "");
 		String dataSourceName = cacheModel.getDataSource();
 		if (dataSourceName == null) {
 			dataSourceName = sqlToyConfig.getDataSource();

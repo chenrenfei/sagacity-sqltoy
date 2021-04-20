@@ -69,7 +69,7 @@ public class IgnoreKeyCaseMap<K, V> extends ConcurrentHashMap<K, V> {
 		}
 		Iterator<?> iter = map.entrySet().iterator();
 		while (iter.hasNext()) {
-			Map.Entry<K, V> entry = (Map.Entry<K, V>) iter.next();
+			Entry<K, V> entry = (Entry<K, V>) iter.next();
 			super.put((K) toLowCaseKey(entry.getKey()), entry.getValue());
 		}
 	}

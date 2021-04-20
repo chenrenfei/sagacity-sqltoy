@@ -26,4 +26,8 @@ public class QueryHelper {
     public static void flush() {
         sqlToyLazyDao.flush();
     }
+
+    public static void closeConnection() {
+        sqlToyLazyDao.closeConnection();
+    }
 }

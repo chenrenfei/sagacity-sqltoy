@@ -3,9 +3,8 @@
  */
 package org.sagacity.sqltoy.model;
 
-import java.io.Serializable;
-
 import javax.sql.DataSource;
+import java.io.Serializable;
 
 /**
  * @project sagacity-sqltoy4.0

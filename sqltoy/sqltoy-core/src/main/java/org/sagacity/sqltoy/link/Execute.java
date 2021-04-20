@@ -3,16 +3,15 @@
  */
 package org.sagacity.sqltoy.link;
 
-import java.io.Serializable;
-
-import javax.sql.DataSource;
-
 import org.sagacity.sqltoy.SqlToyContext;
 import org.sagacity.sqltoy.callback.ReflectPropertyHandler;
-import org.sagacity.sqltoy.config.SqlConfigParseUtils;
 import org.sagacity.sqltoy.config.model.SqlToyConfig;
 import org.sagacity.sqltoy.config.model.SqlType;
+import org.sagacity.sqltoy.utils.BeanUtil;
 import org.sagacity.sqltoy.utils.StringUtil;
+
+import javax.sql.DataSource;
+import java.io.Serializable;
 
 /**
  * @project sagacity-sqltoy
@@ -108,13 +107,13 @@ public class Execute extends BaseLink {
 		if (StringUtil.isBlank(sql)) {
 			throw new IllegalArgumentException("execute operate sql is null!");
 		}
-		SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sql, SqlType.update);
+		SqlToyConfig sqlToyConfig = sqlToyContext.getSqlToyConfig(sql, SqlType.update, super.getDialect());
 		// 根据sql中的变量从entity对象中提取参数值
 		Object[] values = paramsValue;
 		String[] names = paramsNamed;
 		if (entity != null) {
 			names = sqlToyConfig.getParamsName();
-			values = SqlConfigParseUtils.reflectBeanParams(names, entity, reflectPropertyHandler);
+			values = BeanUtil.reflectBeanToAry(entity, names, null, reflectPropertyHandler);
 		}
 		return dialectFactory.executeSql(sqlToyContext, sqlToyConfig, names, values, autoCommit,
 				getDataSource(sqlToyConfig));

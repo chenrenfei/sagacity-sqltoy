@@ -1,14 +1,15 @@
 package org.sagacity.sqltoy.model;
 
-import java.io.Serializable;
-
-import javax.sql.DataSource;
-
+import org.sagacity.sqltoy.callback.SelectFields;
 import org.sagacity.sqltoy.config.model.PageOptimize;
 import org.sagacity.sqltoy.config.model.SecureMask;
 import org.sagacity.sqltoy.config.model.Translate;
 import org.sagacity.sqltoy.utils.CollectionUtil;
 import org.sagacity.sqltoy.utils.StringUtil;
+
+import javax.sql.DataSource;
+import java.io.Serializable;
+import java.util.Map;
 
 /**
  * @description 提供给代码中进行查询使用，一般适用于接口服务内部逻辑处理以单表为主体(不用于页面展示)
@@ -32,6 +33,37 @@ public class EntityQuery implements Serializable {
 	private EntityQueryExtend innerModel = new EntityQueryExtend();
 
 	/**
+	 * @TODO 设置查询的字段(不设置默认查询全部字段)
+	 * @param fields
+	 * @return
+	 */
+	public EntityQuery select(String... fields) {
+		// 支持"fieldA,fieldB" 这种模式编写
+		if (fields != null && fields.length == 1) {
+			String[] realFields = fields[0].split("\\,");
+			for (int i = 0; i < realFields.length; i++) {
+				realFields[i] = realFields[i].trim();
+			}
+			innerModel.fields = realFields;
+		} else {
+			innerModel.fields = fields;
+		}
+		return this;
+	}
+
+	/**
+	 * @TODO 用链式模式实现字段选择
+	 * @param selectFields
+	 * @return
+	 */
+	public EntityQuery select(SelectFields selectFields) {
+		if (selectFields != null) {
+			innerModel.fields = selectFields.getSelectFields();
+		}
+		return this;
+	}
+
+	/**
 	 * @TODO where 条件
 	 * @param where
 	 * @return
@@ -48,6 +80,27 @@ public class EntityQuery implements Serializable {
 
 	public EntityQuery values(Object... values) {
 		innerModel.values = values;
+		return this;
+	}
+
+	/**
+	 * @TODO 用map形式传参
+	 * @param paramsMap
+	 * @return
+	 */
+	public EntityQuery paramsMap(Map<String, Object> paramsMap) {
+		NamedValuesModel model = CollectionUtil.mapToNamedValues(paramsMap);
+		innerModel.names = model.getNames();
+		innerModel.values = model.getValues();
+		return this;
+	}
+
+	/**
+	 * @TODO 设置条件过滤空白转null为false
+	 * @return
+	 */
+	public EntityQuery blankNotNull() {
+		innerModel.blankToNull = false;
 		return this;
 	}
 
@@ -104,12 +157,17 @@ public class EntityQuery implements Serializable {
 		if (filters != null && filters.length > 0) {
 			for (ParamsFilter filter : filters) {
 				if (StringUtil.isBlank(filter.getType()) || StringUtil.isBlank(filter.getParams())) {
-					throw new IllegalArgumentException("针对EntityQuery设置条件过滤必须要设置参数名称和过滤的类型!");
+					throw new IllegalArgumentException("针对EntityQuery设置条件过滤必须要设置filterParams=[" + filter.getParams()
+							+ "],和filterType=[" + filter.getType() + "]!");
 				}
-				if (CollectionUtil.any(filter.getType(), "eq", "neq", "gt", "gte", "lt", "lte")) {
+				if (CollectionUtil.any(filter.getType(), "eq", "neq", "gt", "gte", "lt", "lte", "blank")) {
 					if (StringUtil.isBlank(filter.getValue())) {
 						throw new IllegalArgumentException("针对EntityQuery设置条件过滤eq、neq、gt、lt等类型必须要设置values值!");
 					}
+				}
+				// 存在blank 过滤器自动将blank param="*" 关闭
+				if (filter.getType().equals("blank")) {
+					innerModel.blankToNull = false;
 				}
 				innerModel.paramFilters.add(filter);
 			}
@@ -130,7 +188,8 @@ public class EntityQuery implements Serializable {
 				if (StringUtil.isBlank(extend.cache) || StringUtil.isBlank(extend.keyColumn)
 						|| StringUtil.isBlank(extend.column)) {
 					throw new IllegalArgumentException(
-							"针对EntityQuery设置缓存翻译必须要明确:cacheName、keyColumn(作为key的字段列)、 column(翻译结果映射的列)!");
+							"针对EntityQuery设置缓存翻译必须要明确:cacheName=[" + extend.cache + "]、keyColumn=[" + extend.keyColumn
+									+ "](作为key的字段列)、 column=[" + extend.column + "](翻译结果映射的列)!");
 				}
 				innerModel.translates.put(extend.column, trans);
 			}

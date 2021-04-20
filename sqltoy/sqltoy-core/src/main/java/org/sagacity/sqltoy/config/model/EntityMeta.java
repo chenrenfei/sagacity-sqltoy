@@ -3,13 +3,13 @@
  */
 package org.sagacity.sqltoy.config.model;
 
+import org.sagacity.sqltoy.plugins.id.IdGenerator;
+import org.sagacity.sqltoy.utils.StringUtil;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-
-import org.sagacity.sqltoy.plugins.id.IdGenerator;
-import org.sagacity.sqltoy.utils.StringUtil;
 
 /**
  * @project sqltoy-orm

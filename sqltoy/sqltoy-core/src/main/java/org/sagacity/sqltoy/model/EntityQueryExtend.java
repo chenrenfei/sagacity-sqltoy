@@ -3,17 +3,16 @@
  */
 package org.sagacity.sqltoy.model;
 
+import org.sagacity.sqltoy.config.model.PageOptimize;
+import org.sagacity.sqltoy.config.model.SecureMask;
+import org.sagacity.sqltoy.config.model.Translate;
+
+import javax.sql.DataSource;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-
-import javax.sql.DataSource;
-
-import org.sagacity.sqltoy.config.model.PageOptimize;
-import org.sagacity.sqltoy.config.model.SecureMask;
-import org.sagacity.sqltoy.config.model.Translate;
 
 /**
  * @project sqltoy-orm
@@ -44,6 +43,11 @@ public class EntityQueryExtend implements Serializable {
 	public Object[] values;
 
 	/**
+	 * 查询哪些字段
+	 */
+	public String[] fields;
+
+	/**
 	 * 数据源
 	 */
 	public DataSource dataSource;
@@ -52,6 +56,11 @@ public class EntityQueryExtend implements Serializable {
 	 * 锁类型
 	 */
 	public LockMode lockMode;
+
+	/**
+	 * 空白字符转为null，默认为true
+	 */
+	public boolean blankToNull = true;
 
 	/**
 	 * 动态增加缓存翻译配置
@@ -72,7 +81,7 @@ public class EntityQueryExtend implements Serializable {
 	 * 对字段进行安全脱敏
 	 */
 	public LinkedHashMap<String, SecureMask> secureMask = new LinkedHashMap<String, SecureMask>();
-	
+
 	/**
 	 * 分页优化模型
 	 */

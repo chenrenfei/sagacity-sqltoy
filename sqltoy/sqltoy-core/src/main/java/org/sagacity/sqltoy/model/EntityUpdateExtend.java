@@ -3,10 +3,9 @@
  */
 package org.sagacity.sqltoy.model;
 
+import javax.sql.DataSource;
 import java.io.Serializable;
 import java.util.LinkedHashMap;
-
-import javax.sql.DataSource;
 
 /**
  * @author zhong
@@ -34,6 +33,9 @@ public class EntityUpdateExtend implements Serializable {
 	 */
 	public DataSource dataSource;
 
+	/**
+	 * update 的字段名称和对应的值
+	 */
 	public LinkedHashMap<String, Object> updateValues = new LinkedHashMap<String, Object>();
 
 }
