@@ -74,7 +74,8 @@ public class SqlUtil {
 	 * sql中的单行注释
 	 */
 	public final static Pattern maskPattern = Pattern.compile("\\/\\*[^+!]");
-
+	//单行--注释
+	public final static Pattern lineMaskPattern = Pattern.compile("^\\s*\\-{2}");
 	public static final Pattern ORDER_BY_PATTERN = Pattern.compile("(?i)\\Worder\\s+by\\W");
 
 	public static final Pattern UPCASE_ORDER_PATTERN = Pattern.compile("\\WORder\\s+");
@@ -584,8 +585,9 @@ public class SqlUtil {
 			}
 			markIndex = StringUtil.matchIndex(sql, maskPattern);
 		}
+		// update 2021-04-21 兼容sql中 含-- 模式，如:decode("--")
 		// 剔除单行注释
-		markIndex = sql.indexOf("--");
+		markIndex = StringUtil.matchIndex(sql, lineMaskPattern);
 		while (markIndex != -1) {
 			// 换行符号
 			endMarkIndex = sql.indexOf("\n", markIndex);
@@ -596,7 +598,7 @@ public class SqlUtil {
 				// update 2017-6-5 增加concat(" ")避免因换行导致sql语句直接相连
 				sql = sql.substring(0, markIndex).concat(" ").concat(sql.substring(endMarkIndex + 1));
 			}
-			markIndex = sql.indexOf("--");
+			markIndex = StringUtil.matchIndex(sql, lineMaskPattern);
 		}
 		// 剔除sql末尾的分号逗号(开发过程中容易忽视)
 		if (sql.endsWith(";") || sql.endsWith(",")) {
@@ -830,8 +832,7 @@ public class SqlUtil {
 							pst.clearBatch();
 						}
 					} else {
-						pst.execute();
-						updateCount = updateCount + ((pst.getUpdateCount() > 0) ? pst.getUpdateCount() : 0);
+						updateCount=pst.executeUpdate();
 					}
 				}
 			}

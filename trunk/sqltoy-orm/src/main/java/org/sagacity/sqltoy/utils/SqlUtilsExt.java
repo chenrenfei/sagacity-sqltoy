@@ -101,8 +101,7 @@ public class SqlUtilsExt {
 							pst.clearBatch();
 						}
 					} else {
-						pst.execute();
-						updateCount = updateCount + ((pst.getUpdateCount() > 0) ? pst.getUpdateCount() : 0);
+						updateCount=pst.executeUpdate();
 					}
 				}
 			}
@@ -215,8 +214,7 @@ public class SqlUtilsExt {
 							pst.clearBatch();
 						}
 					} else {
-						pst.execute();
-						updateCount = updateCount + ((pst.getUpdateCount() > 0) ? pst.getUpdateCount() : 0);
+						updateCount=pst.executeUpdate();
 					}
 				}
 			}
