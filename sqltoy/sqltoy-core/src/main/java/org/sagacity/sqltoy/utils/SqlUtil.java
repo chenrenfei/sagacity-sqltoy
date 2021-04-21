@@ -550,15 +550,17 @@ public class SqlUtil {
 			String[] sqlAry = sql.split("\\n");
 			StringBuilder sqlBuffer = new StringBuilder();
 			int startMask;
+			int lineMaskIndex;
 			for (String line : sqlAry) {
 				// 排除掉-- 开头的行语句
 				if (!line.trim().startsWith("--")) {
 					// 不包含-- 直接拼接
-					if (!line.contains("--")) {
+					lineMaskIndex = line.indexOf("--");
+					if (lineMaskIndex == -1) {
 						sqlBuffer.append(line);
 					} else {
 						// 找到-- 单行注释开始位置(排除在'',""中间的场景)
-						startMask = findStartLineMask(line);
+						startMask = findStartLineMask(line, lineMaskIndex);
 						if (startMask > 0) {
 							sqlBuffer.append(line.substring(0, startMask));
 						} else {
@@ -608,16 +610,23 @@ public class SqlUtil {
 	/**
 	 * @TODO 找到行注释的开始位置
 	 * @param sql
+	 * @param lineMaskIndex
 	 * @return
 	 */
-	private static int findStartLineMask(String sql) {
-		// 删除所有对称的括号中的内容
+	private static int findStartLineMask(String sql, int lineMaskIndex) {
+		// 单引号、双引号、hint注释结尾 的最后位置
+		int lastIndex = StringUtil.matchLastIndex(sql, "\'|\"|\\*\\/");
+		// 行注释的位置在单引号等最后位置后面,直接返回
+		if (lineMaskIndex > lastIndex) {
+			return lineMaskIndex;
+		}
 		int start = StringUtil.matchIndex(sql, "\'");
 		int symMarkEnd;
+		int size = sql.length();
 		while (start != -1) {
 			symMarkEnd = StringUtil.getSymMarkIndex("'", "'", sql, start);
 			if (symMarkEnd != -1) {
-				sql = sql.substring(0, start).concat(StringUtil.loopAppendWithSign(" ", "", symMarkEnd - start + 1))
+				sql = sql.substring(0, start).concat(loopBlank(symMarkEnd - start + 1))
 						.concat(sql.substring(symMarkEnd + 1));
 				start = StringUtil.matchIndex(sql, "\'");
 			} else {
@@ -628,7 +637,7 @@ public class SqlUtil {
 		while (start != -1) {
 			symMarkEnd = StringUtil.getSymMarkIndex("\"", "\"", sql, start);
 			if (symMarkEnd != -1) {
-				sql = sql.substring(0, start).concat(StringUtil.loopAppendWithSign(" ", "", symMarkEnd - start + 1))
+				sql = sql.substring(0, start).concat(loopBlank(symMarkEnd - start + 1))
 						.concat(sql.substring(symMarkEnd + 1));
 				start = StringUtil.matchIndex(sql, "\"");
 			} else {
@@ -639,14 +648,26 @@ public class SqlUtil {
 		while (start != -1) {
 			symMarkEnd = StringUtil.getSymMarkIndex("/*", "*/", sql, start);
 			if (symMarkEnd != -1) {
-				sql = sql.substring(0, start).concat(StringUtil.loopAppendWithSign(" ", "", symMarkEnd - start + 2))
+				sql = sql.substring(0, start).concat(loopBlank(symMarkEnd - start + 2))
 						.concat(sql.substring(symMarkEnd + 2));
 				start = sql.indexOf("/*");
 			} else {
 				break;
 			}
 		}
+		System.err.println("size=" + size + " lastSize=" + sql.length());
 		return sql.indexOf("--");
+	}
+
+	private static String loopBlank(int size) {
+		if (size == 0) {
+			return "";
+		}
+		StringBuilder result = new StringBuilder();
+		for (int i = 0; i < size; i++) {
+			result.append(" ");
+		}
+		return result.toString();
 	}
 
 	/**
