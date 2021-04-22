@@ -634,7 +634,7 @@ public class SqlUtil {
 		}
 		int start = StringUtil.matchIndex(sql, "\'");
 		int symMarkEnd;
-		int size = sql.length();
+		
 		while (start != -1) {
 			symMarkEnd = StringUtil.getSymMarkIndex("'", "'", sql, start);
 			if (symMarkEnd != -1) {
@@ -667,7 +667,7 @@ public class SqlUtil {
 				break;
 			}
 		}
-		System.err.println("size=" + size + " lastSize=" + sql.length());
+		
 		return sql.indexOf("--");
 	}
 
